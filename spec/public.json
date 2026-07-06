@@ -52,7 +52,8 @@
         "summary": "List Backtests by Strategy",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "getBacktests"
       },
       "post": {
         "requestBody": {
@@ -106,7 +107,8 @@
         "summary": "Submit Backtest",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "postBacktests"
       }
     },
     "/api/backtests/limits": {
@@ -142,7 +144,8 @@
         "summary": "Get Backtest Limits",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "getBacktestsLimits"
       }
     },
     "/api/backtests/{id}": {
@@ -171,7 +174,8 @@
         "summary": "Cancel Backtest",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "deleteBacktestsById"
       },
       "get": {
         "parameters": [
@@ -215,7 +219,8 @@
         "summary": "Get Backtest",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "getBacktestsById"
       }
     },
     "/api/backtests/{id}/trades": {
@@ -280,7 +285,8 @@
         "summary": "List Backtest Trades",
         "tags": [
           "Backtests"
-        ]
+        ],
+        "operationId": "getBacktestsByIdTrades"
       }
     },
     "/api/health": {
@@ -313,7 +319,8 @@
         "summary": "Get Health",
         "tags": [
           "System"
-        ]
+        ],
+        "operationId": "getHealth"
       }
     },
     "/api/me/api-keys": {
@@ -362,7 +369,8 @@
         "summary": "List API Keys",
         "tags": [
           "API-Keys"
-        ]
+        ],
+        "operationId": "getMeApiKeys"
       },
       "post": {
         "description": "Creates an api token. The plaintext is returned once and never stored — copy it now.",
@@ -437,7 +445,8 @@
         "summary": "Create API Key",
         "tags": [
           "API-Keys"
-        ]
+        ],
+        "operationId": "postMeApiKeys"
       }
     },
     "/api/me/api-keys/{id}": {
@@ -507,7 +516,8 @@
         "summary": "Revoke API Key",
         "tags": [
           "API-Keys"
-        ]
+        ],
+        "operationId": "deleteMeApiKeysById"
       },
       "patch": {
         "description": "Updates the display name of one of the caller's api tokens.",
@@ -586,7 +596,8 @@
         "summary": "Rename API Key",
         "tags": [
           "API-Keys"
-        ]
+        ],
+        "operationId": "patchMeApiKeysById"
       }
     },
     "/api/me/credits": {
@@ -635,7 +646,8 @@
         "summary": "Get My Credits",
         "tags": [
           "Credits"
-        ]
+        ],
+        "operationId": "getMeCredits"
       }
     },
     "/api/me/credits/ledger": {
@@ -694,7 +706,8 @@
         "summary": "Get My Credit Ledger",
         "tags": [
           "Credits"
-        ]
+        ],
+        "operationId": "getMeCreditsLedger"
       }
     },
     "/api/mints": {
@@ -825,7 +838,8 @@
         "summary": "List Active Mints",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMints"
       }
     },
     "/api/mints/{pubkey}": {
@@ -882,7 +896,8 @@
         "summary": "Get Mint",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkey"
       }
     },
     "/api/mints/{pubkey}/lp-events": {
@@ -958,7 +973,8 @@
         "summary": "List Mint LP Events",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyLpEvents"
       }
     },
     "/api/mints/{pubkey}/markets": {
@@ -1026,7 +1042,8 @@
         "summary": "List Mint Markets",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyMarkets"
       }
     },
     "/api/mints/{pubkey}/migrations": {
@@ -1086,7 +1103,8 @@
         "summary": "List Mint Migrations",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyMigrations"
       }
     },
     "/api/mints/{pubkey}/safety-events": {
@@ -1162,7 +1180,8 @@
         "summary": "List Mint Safety Events",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeySafetyEvents"
       }
     },
     "/api/mints/{pubkey}/stats": {
@@ -1219,7 +1238,8 @@
         "summary": "Find Mint Stats Bundle",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyStats"
       }
     },
     "/api/mints/{pubkey}/top-holders": {
@@ -1303,7 +1323,8 @@
         "summary": "List Mint Top Holders",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyTopHolders"
       }
     },
     "/api/mints/{pubkey}/top-traders": {
@@ -1387,7 +1408,8 @@
         "summary": "List Mint Top Traders",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyTopTraders"
       }
     },
     "/api/mints/{pubkey}/traders/{trader}": {
@@ -1463,7 +1485,8 @@
         "summary": "Get Mint Trader Stats",
         "tags": [
           "Mints"
-        ]
+        ],
+        "operationId": "getMintsByPubkeyTradersByTrader"
       }
     },
     "/api/ohlcv": {
@@ -1574,7 +1597,8 @@
         "summary": "List OHLCV Candles",
         "tags": [
           "OHLCV"
-        ]
+        ],
+        "operationId": "getOhlcv"
       }
     },
     "/api/strategies": {
@@ -1640,7 +1664,8 @@
         "summary": "List Strategies",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "getStrategies"
       },
       "post": {
         "requestBody": {
@@ -1684,7 +1709,8 @@
         "summary": "Create Strategy",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "postStrategies"
       }
     },
     "/api/strategies/dashboard": {
@@ -1719,7 +1745,8 @@
         "summary": "Strategy Dashboard Stats",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "getStrategiesDashboard"
       }
     },
     "/api/strategies/preview": {
@@ -1765,7 +1792,8 @@
         "summary": "Preview Strategy",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "postStrategiesPreview"
       }
     },
     "/api/strategies/with-stats": {
@@ -1821,7 +1849,8 @@
         "summary": "List Strategies with Stats",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "getStrategiesWithStats"
       }
     },
     "/api/strategies/{id}": {
@@ -1860,7 +1889,8 @@
         "summary": "Delete Strategy",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "deleteStrategiesById"
       },
       "get": {
         "parameters": [
@@ -1904,7 +1934,8 @@
         "summary": "Get Strategy",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "getStrategiesById"
       },
       "put": {
         "parameters": [
@@ -1969,7 +2000,8 @@
         "summary": "Update Strategy",
         "tags": [
           "Strategies"
-        ]
+        ],
+        "operationId": "putStrategiesById"
       }
     },
     "/api/subscriptions/me": {
@@ -2015,7 +2047,8 @@
         "summary": "Get My Subscription",
         "tags": [
           "Subscriptions"
-        ]
+        ],
+        "operationId": "getSubscriptionsMe"
       }
     },
     "/api/swaps": {
@@ -2148,7 +2181,8 @@
         "summary": "List Swaps",
         "tags": [
           "Swaps"
-        ]
+        ],
+        "operationId": "getSwaps"
       }
     },
     "/api/tips/global": {
@@ -2188,7 +2222,8 @@
         "summary": "Global tip stats",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsGlobal"
       }
     },
     "/api/tips/heatmap": {
@@ -2236,7 +2271,8 @@
         "summary": "Tip heatmap",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsHeatmap"
       }
     },
     "/api/tips/leaderboard/jito-efficiency": {
@@ -2287,7 +2323,8 @@
         "summary": "Jito-efficiency leaderboard",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsLeaderboardJitoEfficiency"
       }
     },
     "/api/tips/mat": {
@@ -2330,7 +2367,8 @@
         "summary": "Tip moving-average series",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsMat"
       }
     },
     "/api/tips/mev-share": {
@@ -2373,7 +2411,8 @@
         "summary": "Tipped-volume share series",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsMevShare"
       }
     },
     "/api/tips/priority-ratio": {
@@ -2416,7 +2455,8 @@
         "summary": "Tip vs priority-fee ratio series",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsPriorityRatio"
       }
     },
     "/api/tips/services": {
@@ -2459,7 +2499,8 @@
         "summary": "Tip service dominance",
         "tags": [
           "Tips"
-        ]
+        ],
+        "operationId": "getTipsServices"
       }
     },
     "/api/trader-filters/": {
@@ -2508,7 +2549,8 @@
         "summary": "List Trader Filters",
         "tags": [
           "Trader-Filters"
-        ]
+        ],
+        "operationId": "getTraderFilters"
       },
       "post": {
         "description": "Creates a new filter preset for the authenticated user.",
@@ -2583,7 +2625,8 @@
         "summary": "Create Trader Filter",
         "tags": [
           "Trader-Filters"
-        ]
+        ],
+        "operationId": "postTraderFilters"
       }
     },
     "/api/trader-filters/{id}": {
@@ -2653,7 +2696,8 @@
         "summary": "Delete Trader Filter",
         "tags": [
           "Trader-Filters"
-        ]
+        ],
+        "operationId": "deleteTraderFiltersById"
       },
       "get": {
         "description": "Returns a specific filter preset by ID.",
@@ -2728,7 +2772,8 @@
         "summary": "Get Trader Filter",
         "tags": [
           "Trader-Filters"
-        ]
+        ],
+        "operationId": "getTraderFiltersById"
       },
       "put": {
         "description": "Replaces an existing filter preset for the authenticated user.",
@@ -2814,7 +2859,8 @@
         "summary": "Update Trader Filter",
         "tags": [
           "Trader-Filters"
-        ]
+        ],
+        "operationId": "putTraderFiltersById"
       }
     },
     "/api/traders": {
@@ -2926,7 +2972,8 @@
         "summary": "List Traders",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTraders"
       }
     },
     "/api/traders/by-id/{traderID}": {
@@ -3003,7 +3050,8 @@
         "summary": "Get Trader by ID",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByIdByTraderID"
       }
     },
     "/api/traders/by-wallet/{walletAddress}": {
@@ -3070,7 +3118,8 @@
         "summary": "Get Trader by Wallet",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletByWalletAddress"
       }
     },
     "/api/traders/export": {
@@ -3178,7 +3227,8 @@
         "summary": "Export Traders",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "postTradersExport"
       }
     },
     "/api/traders/search": {
@@ -3264,7 +3314,8 @@
         "summary": "Search Traders",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersSearch"
       }
     },
     "/api/traders/snapshot": {
@@ -3319,7 +3370,8 @@
         "summary": "Trader Snapshot",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersSnapshot"
       }
     },
     "/api/traders/{traderID}/daily-profits": {
@@ -3438,7 +3490,8 @@
         "summary": "List Trader Daily Profits",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByTraderIDDailyProfits"
       }
     },
     "/api/traders/{traderID}/pnls": {
@@ -3539,7 +3592,8 @@
         "summary": "List Trader PnLs",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByTraderIDPnls"
       }
     },
     "/api/traders/{walletAddress}/created-tokens": {
@@ -3615,7 +3669,8 @@
         "summary": "List Trader Created Tokens",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletAddressCreatedTokens"
       }
     },
     "/api/traders/{walletAddress}/pnl-series": {
@@ -3697,7 +3752,8 @@
         "summary": "Get Trader Daily PnL Series",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletAddressPnlSeries"
       }
     },
     "/api/traders/{walletAddress}/tips": {
@@ -3782,7 +3838,8 @@
         "summary": "Get Trader Tip Stats",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletAddressTips"
       }
     },
     "/api/traders/{walletAddress}/tips/services": {
@@ -3860,7 +3917,8 @@
         "summary": "List Trader Tip Services",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletAddressTipsServices"
       }
     },
     "/api/traders/{walletAddress}/tokens": {
@@ -3945,7 +4003,8 @@
         "summary": "List Trader Token Positions",
         "tags": [
           "Traders"
-        ]
+        ],
+        "operationId": "getTradersByWalletAddressTokens"
       }
     }
   },
@@ -5469,15 +5528,13 @@
         "enum": [
           "solana",
           "hyperliquid",
-          "polymarket",
-          "solana"
+          "polymarket"
         ],
         "type": "string",
         "x-enum-varnames": [
           "VenueSolana",
           "VenueHyperliquid",
-          "VenuePolymarket",
-          "DefaultVenue"
+          "VenuePolymarket"
         ]
       },
       "pulsight_internal_core_domain_subscription.SubscriptionTier": {

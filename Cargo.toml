@@ -6,14 +6,20 @@ description = "Official Rust client for the Pulsight API"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/pulsight-xyz/pulsight-rust"
 
-# progenitor generates the client from ../openapi/public.json at compile
-# time via the generate_api! macro in src/lib.rs. `cargo build` reveals any
-# additional transitive deps the generated code needs (e.g. chrono/uuid for
-# date/uuid formats) — add them here when the compiler asks.
+# progenitor generates the client from spec/public.json at compile time via the
+# generate_api! macro in src/lib.rs. `cargo build` reveals any additional
+# transitive deps the generated code needs (e.g. chrono/uuid for date/uuid
+# formats) — add them here when the compiler asks.
+#
+# reqwest MUST track the major that progenitor-client depends on (0.14 → reqwest
+# 0.13): the generated client hands our reqwest::Client to progenitor's, so a
+# skew pulls two reqwests and fails to compile (E0053 "incompatible type",
+# missing From<reqwest::Error>). reqwest 0.13 renamed the feature rustls-tls →
+# rustls (aws-lc-rs provider, forced by progenitor-client, builds with cc alone).
 [dependencies]
-progenitor = "0.8"
-progenitor-client = "0.8"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+progenitor = "0.14"
+progenitor-client = "0.14"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
