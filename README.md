@@ -2,6 +2,8 @@
 
 Official Rust client for the [Pulsight](https://pulsight.xyz) public API.
 
+📦 **[crates.io/crates/pulsight](https://crates.io/crates/pulsight)** — `cargo add pulsight`
+
 ## How generation works
 
 Unlike the Go/Python SDKs, the Rust core is generated **at compile time** by
