@@ -17,15 +17,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "description": "Strategy ID (when called via /api/strategies/{id}/backtests)",
-            "in": "path",
-            "name": "id",
-            "schema": {
-              "type": "string"
-            },
-            "required": true
           }
         ],
         "responses": {
