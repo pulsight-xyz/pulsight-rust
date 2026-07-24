@@ -56,6 +56,16 @@
         "operationId": "getBacktests"
       },
       "post": {
+        "parameters": [
+          {
+            "description": "Deduplicates retried submissions: a repeat with the same key replays the existing run instead of charging and starting a new one (max 128 chars)",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -146,6 +156,53 @@
           "Backtests"
         ],
         "operationId": "getBacktestsLimits"
+      }
+    },
+    "/api/backtests/pick-tokens": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.pickTokensRequest"
+              }
+            }
+          },
+          "description": "By-criteria scope + resolution window",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.pickTokensResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Pick Backtest Tokens",
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "postBacktestsPickTokens"
       }
     },
     "/api/backtests/{id}": {
@@ -732,7 +789,7 @@
             }
           },
           {
-            "description": "trades|traders|recent|volume (others fall back to swap_count)",
+            "description": "trades|traders|recent|volume|buys|sells|net_buy|price_change|liquidity_usdc|age (age = newest first_seen first)",
             "in": "query",
             "name": "sort",
             "schema": {
@@ -764,6 +821,14 @@
             "description": "Min window pool quote-reserves (liquidity), WSOL lamports. Omitted ⇒ a default ~1 SOL floor hides dust on untargeted browse; pass 0 to disable, or any value to override.",
             "in": "query",
             "name": "min_pool_sol",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min market cap in USD (price × circulating supply). Mints with no computable market cap are excluded. Omitted ⇒ no floor.",
+            "in": "query",
+            "name": "min_market_cap_usd",
             "schema": {
               "type": "number"
             }
@@ -1105,6 +1170,149 @@
           "Mints"
         ],
         "operationId": "getMintsByPubkeyMigrations"
+      }
+    },
+    "/api/mints/{pubkey}/risk": {
+      "get": {
+        "description": "Scored token risk assessment: normalised score + named risks, top-10 concentration, dev %, mint/freeze authority state, snipers, liquidity, honeypot/copycat. Wallet lists are behind /risk/cohorts.",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.RiskReport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Token Risk Report",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyRisk"
+      }
+    },
+    "/api/mints/{pubkey}/risk/cohorts": {
+      "get": {
+        "description": "Wallet list for one risk cohort. group ∈ {snipers,bundlers,insiders,holders}. Login required (reveals wallet addresses).",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Cohort (snipers|bundlers|insiders|holders)",
+            "in": "query",
+            "name": "group",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Max rows (default 100, max 500)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.RiskCohort"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Token Risk Cohort Wallets",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyRiskCohorts"
       }
     },
     "/api/mints/{pubkey}/safety-events": {
@@ -1542,6 +1750,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "description": "Max candles to return when `from` is omitted (count of candles, gaps ignored; default 500, capped at 5000)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Drop clear price-outlier candles at read time (cosmetic; never changes stored data). Default false.",
+            "in": "query",
+            "name": "removeOutliers",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -1794,6 +2018,53 @@
           "Strategies"
         ],
         "operationId": "postStrategiesPreview"
+      }
+    },
+    "/api/strategies/validate": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.validateStrategyRequest"
+              }
+            }
+          },
+          "description": "Definition to check + optional venue",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_ports_input.StrategyValidation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Validate Strategy",
+        "tags": [
+          "Strategies"
+        ],
+        "operationId": "postStrategiesValidate"
       }
     },
     "/api/strategies/with-stats": {
@@ -3934,11 +4205,20 @@
             }
           },
           {
-            "description": "Sort key (profit|invested|balance|recent)",
+            "description": "Sort key (profit|holding_pnl|roi|invested|balance|recent)",
             "in": "query",
             "name": "sort",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction (asc|desc)",
+            "in": "query",
+            "name": "dir",
+            "schema": {
+              "type": "string",
+              "default": "desc"
             }
           },
           {
@@ -4005,6 +4285,366 @@
           "Traders"
         ],
         "operationId": "getTradersByWalletAddressTokens"
+      }
+    },
+    "/api/webhook-notifiers/": {
+      "get": {
+        "description": "Returns a list of webhook notifiers belonging to the authenticated user.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Notifier"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Webhook Notifiers",
+        "tags": [
+          "Webhook-Notifiers"
+        ],
+        "operationId": "getWebhookNotifiers"
+      },
+      "post": {
+        "description": "Creates a new webhook notifier for the authenticated user.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.WebhookNotifierCreateRequest"
+              }
+            }
+          },
+          "description": "Notifier details",
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Notifier"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Create Webhook Notifier",
+        "tags": [
+          "Webhook-Notifiers"
+        ],
+        "operationId": "postWebhookNotifiers"
+      }
+    },
+    "/api/webhook-notifiers/{id}": {
+      "delete": {
+        "description": "Deletes a webhook notifier owned by the authenticated user.",
+        "parameters": [
+          {
+            "description": "Notifier ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Delete Webhook Notifier",
+        "tags": [
+          "Webhook-Notifiers"
+        ],
+        "operationId": "deleteWebhookNotifiersById"
+      },
+      "get": {
+        "description": "Returns a specific webhook notifier owned by the authenticated user.",
+        "parameters": [
+          {
+            "description": "Notifier ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Notifier"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Get Webhook Notifier",
+        "tags": [
+          "Webhook-Notifiers"
+        ],
+        "operationId": "getWebhookNotifiersById"
+      },
+      "patch": {
+        "description": "Updates an existing webhook notifier owned by the authenticated user.",
+        "parameters": [
+          {
+            "description": "Notifier ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.WebhookNotifierUpdateRequest"
+              }
+            }
+          },
+          "description": "Fields to update",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Notifier"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Update Webhook Notifier",
+        "tags": [
+          "Webhook-Notifiers"
+        ],
+        "operationId": "patchWebhookNotifiersById"
       }
     }
   },
@@ -4134,6 +4774,75 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.WebhookNotifierCreateRequest": {
+        "properties": {
+          "filter_preset_id": {
+            "type": "string"
+          },
+          "interval_hours": {
+            "type": "integer"
+          },
+          "latest_activity_seconds": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "oldest_trade_op": {
+            "type": "string"
+          },
+          "oldest_trade_seconds": {
+            "type": "integer"
+          },
+          "webhook_extra": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "webhook_type": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Type"
+          },
+          "webhook_url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.WebhookNotifierUpdateRequest": {
+        "properties": {
+          "filter_preset_id": {
+            "type": "string"
+          },
+          "interval_hours": {
+            "type": "integer"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "latest_activity_seconds": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "oldest_trade_op": {
+            "type": "string"
+          },
+          "oldest_trade_seconds": {
+            "type": "integer"
+          },
+          "webhook_extra": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "webhook_type": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Type"
+          },
+          "webhook_url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.apiKeyRenameRequest": {
         "properties": {
           "name": {
@@ -4171,6 +4880,28 @@
         "properties": {
           "error": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.pickTokensRequest": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScope"
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TimeRange"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.pickTokensResponse": {
+        "properties": {
+          "mints": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -4336,6 +5067,9 @@
           "arb_pnl_lamports": {
             "type": "integer"
           },
+          "base_decimals": {
+            "type": "integer"
+          },
           "dex": {
             "type": "string"
           },
@@ -4347,6 +5081,12 @@
           },
           "is_buy": {
             "type": "boolean"
+          },
+          "label": {
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
           },
           "mint": {
             "type": "string"
@@ -4365,6 +5105,9 @@
           },
           "signature": {
             "type": "string"
+          },
+          "slot": {
+            "type": "integer"
           },
           "sold_more_than_bought": {
             "type": "boolean"
@@ -4486,6 +5229,37 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.validateStrategyRequest": {
+        "properties": {
+          "def": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
+          },
+          "venue": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.VenueID"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.AuthorityStat": {
+        "properties": {
+          "freeze": {
+            "type": "string"
+          },
+          "freeze_active": {
+            "type": "boolean"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "mint_active": {
+            "type": "boolean"
+          },
+          "observed": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.BondingCurveState": {
         "properties": {
           "graduated": {
@@ -4511,6 +5285,81 @@
           "virtual_token": {
             "description": "Most recent observed virtual_token (NUMERIC → decimal string for\nJSON safety). \"0\" when no curve swap is on file.",
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.BundlerEntry": {
+        "properties": {
+          "balance": {
+            "type": "string"
+          },
+          "initial_balance": {
+            "type": "string"
+          },
+          "initial_pct_of_supply": {
+            "type": "number"
+          },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\") from the\nadmin-managed registry; empty when unknown. Same provenance as\nHolderEntry.Label.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
+          },
+          "pct_of_supply": {
+            "type": "number"
+          },
+          "slot": {
+            "type": "integer"
+          },
+          "wallet": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.BundlerStat": {
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "total_initial_pct": {
+            "type": "number"
+          },
+          "total_pct": {
+            "type": "number"
+          },
+          "wallets": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BundlerEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CohortStat": {
+        "properties": {
+          "available": {
+            "description": "false = signal not computable yet",
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "total_pct": {
+            "description": "% of circulating",
+            "type": "number"
+          },
+          "wallets": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.HolderEntry"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -4568,6 +5417,20 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.DevStat": {
+        "properties": {
+          "creator": {
+            "type": "string"
+          },
+          "pct_of_supply": {
+            "type": "number"
+          },
+          "sold": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.GlobalTipStats": {
         "properties": {
           "p50_tip_lamports": {
@@ -4618,10 +5481,49 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.HolderEntry": {
+        "properties": {
+          "balance": {
+            "description": "raw base units (decimal string)",
+            "type": "string"
+          },
+          "is_bundler": {
+            "type": "boolean"
+          },
+          "is_insider": {
+            "type": "boolean"
+          },
+          "is_sniper": {
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\",\n\"Pump.fun Fees\"/\"fee\") from the admin-managed registry; empty when\nunknown.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "pct_of_supply": {
+            "description": "% of circulating, 0..100",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.JitoEfficiencyRow": {
         "properties": {
           "efficiency_score": {
             "type": "number"
+          },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the trader isn't labelled.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
           },
           "tip_swaps": {
             "type": "integer"
@@ -4687,6 +5589,29 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.LpStat": {
+        "properties": {
+          "burned": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MarketStat": {
+        "properties": {
+          "concentration": {
+            "description": "top-pool volume share, 0..1",
+            "type": "number"
+          },
+          "pool_count": {
+            "type": "integer"
+          },
+          "total_liquidity_usd": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.MatPoint": {
         "properties": {
           "bucket_ts": {
@@ -4716,6 +5641,60 @@
             "type": "integer"
           },
           "total_volume_lamports": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintBundled": {
+        "properties": {
+          "initial_pct": {
+            "type": "number"
+          },
+          "wallets": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintHoneypot": {
+        "properties": {
+          "buy_count": {
+            "description": "BuyCount/SellCount/Buyers/Sellers back \"buy_dominant\": an all-time sell-trap\n(> buyDominanceMinBuyShare buys over > buyDominanceMinSwaps swaps).\nBuyers/Sellers are distinct wallets.",
+            "type": "integer"
+          },
+          "buyers": {
+            "type": "integer"
+          },
+          "duplicate_count": {
+            "description": "DuplicateCount backs \"copycat\": how many mints share this (symbol, name).",
+            "type": "integer"
+          },
+          "freeze_count": {
+            "description": "FreezeCount/ThawCount back the \"freezes_holders\" reason.",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sell_count": {
+            "type": "integer"
+          },
+          "sellers": {
+            "type": "integer"
+          },
+          "thaw_count": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintInsiders": {
+        "properties": {
+          "wallets": {
             "type": "integer"
           }
         },
@@ -4782,7 +5761,15 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BondingCurveState"
               }
             ],
-            "description": "── CA mint-catalog enrichment (ported from mint_catalog.rs::find /\nlist_active). bonding_curve + dev_holdings populate on BOTH\n/api/mints (list) and /api/mints/:pubkey (detail); supply +\nauthorities populate on the detail path only (nil on list rows).\nAll pointer + omitempty so list rows stay lean. The frontend's\nCurveBadge/DevPill already render bonding_curve/dev_holdings."
+            "description": "── CA mint-catalog enrichment (ported from mint_catalog.rs::find /\nlist_active). bonding_curve + dev_holdings + supply populate on BOTH\n/api/mints (list) and /api/mints/:pubkey (detail); authorities\npopulate on the detail path only (nil on list rows). All pointer +\nomitempty so list rows stay lean. The frontend's CurveBadge/DevPill\nalready render bonding_curve/dev_holdings."
+          },
+          "bundled": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintBundled"
+              }
+            ],
+            "description": "Bundled/Insiders are the audit-cell cohort flags (best-effort list\ndecoration; absent when not notable). Bundled = a same-slot launch buy\ncluster (swap-derived); Insiders = the creator distributed supply via\nlaunch-window SPL transfers (needs token-program capture). Both are\nat-a-glance proxies for the per-mint risk card's full cohorts."
           },
           "buy_count": {
             "description": "BuyCount/SellCount: buy- vs sell-side swap counts over the `?hours`\nactivity window (countIf(is_buy)). Populated on the list path; 0 on\nthe detail path.",
@@ -4806,6 +5793,21 @@
           "freeze_authority": {
             "type": "string"
           },
+          "holder_count": {
+            "description": "── GMGN-style discovery enrichment (list path only, best-effort). ──\nHolderCount is the number of distinct wallets currently holding a\npositive balance of this mint (uniqExact over trader_token_stats).\nnil when the holders batch is unavailable. Best-effort: a holders\nhiccup decorates fewer rows, it never fails the listing.",
+            "type": "integer"
+          },
+          "honeypot": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintHoneypot"
+              }
+            ],
+            "description": "Honeypot flags a likely sell-blocking token. Best-effort decoration;\nabsent when no reason fires. Step 1 populates the \"freezes_holders\"\nreason from mint_safety_events (froze many holder accounts, thawed\nfew). Future Token-2022 reasons (transfer_fee/hook/…) accrete here."
+          },
+          "insiders": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintInsiders"
+          },
           "is_mayhem_mode": {
             "description": "IsMayhemMode flags a Pump.fun \"Mayhem\"-mode token (its trades route\nthrough the Mayhem custody program). Populated on BOTH list and detail\nfrom the mint_mayhem table; omitted when false.",
             "type": "boolean"
@@ -4815,6 +5817,10 @@
           },
           "logo_uri": {
             "type": "string"
+          },
+          "market_cap_usd": {
+            "description": "MarketCapUsd is PriceUsd × circulating supply. Equivalently\nclose_sol × supply_raw × sol_usd / 1e6 (token decimals cancel), so\nit's populated even when decimals are unknown (unlike PriceUsd). nil\nwhen the WSOL close, supply, or SOL/USD ref is missing.",
+            "type": "number"
           },
           "markets_count": {
             "type": "integer"
@@ -4833,6 +5839,17 @@
           "name": {
             "type": "string"
           },
+          "price_usd": {
+            "description": "PriceUsd is the latest price per WHOLE token in USD, derived from the\ndominant WSOL-quoted OHLCV close × the SOL/USD reference rate. nil\nwhen there's no WSOL pool, decimals are unknown, or no SOL/USD ref.",
+            "type": "number"
+          },
+          "risk_score": {
+            "description": "RiskScore/RiskVerdict are a fast at-a-glance risk score (0..100 +\nlow|caution|high|critical) computed from the signals already on this row\n(authorities, honeypot/copycat/sell-trap, dev %, bundle) via the same\ndomain ScoreRisk as the per-mint risk card. The listing omits the inputs\nthat need per-mint queries (top-10 concentration, snipers, insider %,\nliquidity), so this is a LOWER BOUND of the card's full score — the token\npage is authoritative. nil only if scoring was skipped.",
+            "type": "integer"
+          },
+          "risk_verdict": {
+            "type": "string"
+          },
           "sell_count": {
             "type": "integer"
           },
@@ -4845,7 +5862,7 @@
             "description": "Windowed stats bundle keyed by window. Reuses the same\nMintStatsByWindow struct that GET /api/mints/:pubkey/stats\nreturns so the frontend's ActiveMint.stats path consumes both\nendpoints identically.\n\n/api/mints/:pubkey/stats (FindStatsBundle) populates all four\nwindows in one round-trip.\n\n/api/mints (ListActive) currently populates ONLY the active\nwindow's bucket — the other three windows in the per-row\nMintStatsByWindow stay zero-valued. The frontend's\n`m.stats?.[window]?.…` chain renders `—` on null, so this is\nsafe; an N-row × 4-window fan-out would mean 3× more LATERAL\njoins per page and the UI only ever shows one window at a time\n(window switch refetches the page). If a future surface needs\nall four windows in the list response, extend ListActive to\nmatch FindStatsBundle's four-LATERAL pattern."
           },
           "supply": {
-            "description": "Supply is the on-chain total supply (NUMERIC → decimal string);\nnil until the enricher has decoded the mint account.",
+            "description": "Supply is the on-chain total supply (NUMERIC → decimal string, raw\nsmallest units); nil until the enricher has decoded the mint account.\nPopulated on the list path to back the market-cap column.",
             "type": "string"
           },
           "swap_count": {
@@ -4856,6 +5873,10 @@
             "type": "string"
           },
           "trader_count": {
+            "type": "integer"
+          },
+          "unique_traders": {
+            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable.",
             "type": "integer"
           }
         },
@@ -4892,8 +5913,28 @@
           "holding_pnl_lamports": {
             "type": "integer"
           },
+          "is_bundler": {
+            "type": "boolean"
+          },
+          "is_insider": {
+            "type": "boolean"
+          },
+          "is_sniper": {
+            "type": "boolean"
+          },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (CEX/fee/...) from the\nadmin-managed registry; empty when unknown.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
+          },
           "last_active_ts": {
             "type": "string"
+          },
+          "pct_of_supply": {
+            "description": "PctOfSupply is the holder's % of circulating supply, set on the\ntop-holders path (now sourced from on-chain holder_balances). nil on the\ntop-traders path. IsSniper/IsBundler/IsInsider flag cohort membership\n(bundler/insider populate in phase 2 — always false until then).",
+            "type": "number"
           },
           "realized_profit": {
             "type": "integer"
@@ -5002,6 +6043,123 @@
           },
           "token_volume": {
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.RiskCohort": {
+        "properties": {
+          "bundlers": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BundlerEntry"
+            },
+            "type": "array"
+          },
+          "group": {
+            "type": "string"
+          },
+          "wallets": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.HolderEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.RiskItem": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.RiskLevel"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.RiskLevel": {
+        "enum": [
+          "warn",
+          "danger"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "RiskWarn",
+          "RiskDanger"
+        ]
+      },
+      "pulsight_internal_core_domain_aggregator.RiskReport": {
+        "properties": {
+          "authorities": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.AuthorityStat"
+          },
+          "bundlers": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BundlerStat"
+          },
+          "dev": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.DevStat"
+          },
+          "holder_count": {
+            "type": "integer"
+          },
+          "holders": {
+            "description": "top few (summary)",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.HolderEntry"
+            },
+            "type": "array"
+          },
+          "insiders": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CohortStat"
+          },
+          "lp": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.LpStat"
+          },
+          "markets": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MarketStat"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "risks": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.RiskItem"
+            },
+            "type": "array"
+          },
+          "rugged": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "score_normalised": {
+            "description": "0..100",
+            "type": "integer"
+          },
+          "snipers": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CohortStat"
+          },
+          "supply_known": {
+            "type": "boolean"
+          },
+          "top10": {
+            "description": "% of circulating",
+            "type": "number"
+          },
+          "verdict": {
+            "description": "low|caution|high|critical",
+            "type": "string"
           }
         },
         "type": "object"
@@ -5265,6 +6423,14 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_apikey.Kind"
+              }
+            ],
+            "description": "Kind is user for self-minted api tokens, bot for admin-minted bot\nservice keys. Empty (pre-076 rows) reads as user."
+          },
           "last_used_at": {
             "type": "string"
           },
@@ -5289,19 +6455,36 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_apikey.Kind": {
+        "enum": [
+          "user",
+          "bot"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "KindUser",
+          "KindBot"
+        ]
+      },
       "pulsight_internal_core_domain_apikey.Scope": {
         "enum": [
           "data:read",
+          "backtest:read",
           "backtest:run",
           "strategy:read",
-          "strategy:write"
+          "strategy:write",
+          "workspace:read",
+          "workspace:write"
         ],
         "type": "string",
         "x-enum-varnames": [
           "ScopeDataRead",
+          "ScopeBacktestRead",
           "ScopeBacktestRun",
           "ScopeStrategyRead",
-          "ScopeStrategyWrite"
+          "ScopeStrategyWrite",
+          "ScopeWorkspaceRead",
+          "ScopeWorkspaceWrite"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -5407,14 +6590,16 @@
           "freeze_renounced",
           "mint_renounced",
           "lp_burned",
-          "dev_sold"
+          "dev_sold",
+          "honeypot"
         ],
         "type": "string",
         "x-enum-varnames": [
           "EventFreezeRenounced",
           "EventMintRenounced",
           "EventLpBurned",
-          "EventDevSold"
+          "EventDevSold",
+          "EventHoneypot"
         ]
       },
       "pulsight_internal_core_domain_strategy.GlobalConstraints": {
@@ -5808,6 +6993,13 @@
           "is_favorite": {
             "type": "boolean"
           },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the wallet isn't labelled.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
+          },
           "last_active_timestamp": {
             "description": "Activity",
             "type": "integer"
@@ -6003,6 +7195,72 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_webhook.Notifier": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "filter_preset_id": {
+            "description": "Solana trader filter",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "interval_hours": {
+            "type": "integer"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "last_sent_at": {
+            "type": "string"
+          },
+          "latest_activity_seconds": {
+            "description": "LatestActivitySeconds restricts delivery to traders whose most recent\nactivity is within this many seconds (nil = off). Unlike the oldest-trade\nknob, it has no leaderboard-clause equivalent: the dispatch worker\npost-filters matched rows by last_active_timestamp.",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "oldest_trade_op": {
+            "description": "\">\", \"<\", \">=\", \"<=\"",
+            "type": "string"
+          },
+          "oldest_trade_seconds": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "webhook_extra": {
+            "additionalProperties": {},
+            "description": "platform-specific config (e.g. channel ID)",
+            "type": "object"
+          },
+          "webhook_type": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_webhook.Type"
+          },
+          "webhook_url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_webhook.Type": {
+        "enum": [
+          "discord",
+          "telegram"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "TypeDiscord",
+          "TypeTelegram"
+        ]
+      },
       "pulsight_internal_core_ports_input.APIKeyCreateRequest": {
         "properties": {
           "expires_at": {
@@ -6078,6 +7336,23 @@
           },
           "max_webhooks": {
             "type": "integer"
+          },
+          "mcp_access": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_ports_input.StrategyValidation": {
+        "properties": {
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "valid": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -6177,6 +7452,10 @@
           "mint": {
             "type": "string"
           },
+          "pool": {
+            "description": "Pool is the market this held position was simulated on — set for a\npinned or PerPool instrument, empty when the run resolved the mint's\ndominant pool. Disambiguates two open positions of the same mint on\ndifferent pools under PerPool.",
+            "type": "string"
+          },
           "pool_state": {
             "description": "PoolState flags the exit liquidity used to value the position:\n\"ok\" (priced into a live pool), \"drained\" (pool empty → unrealizable,\n~total loss), or \"unknown\" (no pool snapshot → valued at raw mid).",
             "type": "string"
@@ -6251,6 +7530,10 @@
       },
       "pulsight_internal_core_usecases_backtest.BacktestRequest": {
         "properties": {
+          "per_pool": {
+            "description": "PerPool, when true, simulates each of a mint's significant markets as an\nINDEPENDENT instrument — its own candle stream, indicators, ledger and\n(for copy strategies) the target swaps on THAT pool — instead of a single\ndominant/pinned pool per mint. Off ⇒ the historical one-position-per-mint\nbehaviour. Mutually exclusive with a SingleMint pool pin (a pin already\nselects one market). Fans out compute by up to MaxPoolsPerMint per mint,\nreflected in the tick-budget estimate.",
+            "type": "boolean"
+          },
           "scope": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScope"
           },
@@ -6296,6 +7579,10 @@
       },
       "pulsight_internal_core_usecases_backtest.BacktestSummary": {
         "properties": {
+          "copies_skipped_unpriced": {
+            "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap carried no post-swap price\n— so no honest fill price exists for them and they were NOT traded.\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. It is dominated by venues whose\ndecoder emits no marginal price (every Meteora DLMM leg, and every\nDAMM v2 / DBC leg ingested before those decoders were fixed), so a\nlaunch-sniping mirror over historical data can skip most of its entries\nwhile a PumpSwap mirror skips none. Surfaced so a mostly-skipped run\nreads as \"not enough data\" instead of quietly looking like a thin\nstrategy. Additive JSONB field — pre-existing rows decode as 0.",
+            "type": "integer"
+          },
           "ending_balance_sol": {
             "type": "number"
           },
@@ -6374,6 +7661,10 @@
             "type": "integer"
           },
           "mint": {
+            "type": "string"
+          },
+          "pool": {
+            "description": "Pool is the AMM market this trade executed in. For a COPY trade it's the\npool the mirrored target actually swapped in (per-leg dex_swaps); for an\nEMIT trade it's the run's pinned pool (SingleMint pin) or nil when the\nrun resolved the mint's dominant pool (whose identity isn't surfaced).",
             "type": "string"
           },
           "pool_sol_at_trigger": {
@@ -6478,6 +7769,10 @@
             "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
           },
           "mint": {
+            "type": "string"
+          },
+          "pool": {
+            "description": "Pool pins the preview to one market of the mint. Empty lets the\ncandle source resolve the dominant pool within the window.",
             "type": "string"
           },
           "time_range": {
@@ -6602,6 +7897,10 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "pool": {
+            "description": "Pool optionally pins a SingleMint run to one specific market (the AMM\npool pubkey) of the mint. Empty ⇒ the candle source resolves the mint's\ndominant pool within the replay window (the historical default). Only\nvalid on the SingleMint variant — a pool belongs to exactly one mint, so\nit is meaningless on a multi-mint / dynamic scope. Mirrors the preview's\nPreviewRequest.Pool so a pinned run replays the same market the builder\npreviewed.",
+            "type": "string"
           },
           "trader": {
             "description": "TraderTraded only.",
@@ -6845,6 +8144,13 @@
           },
           "is_favorite": {
             "type": "boolean"
+          },
+          "label": {
+            "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the wallet isn't labelled.",
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
           },
           "last_active_timestamp": {
             "type": "integer"
@@ -7124,6 +8430,10 @@
     {
       "name": "Traders",
       "x-displayName": "Traders"
+    },
+    {
+      "name": "Webhook-Notifiers",
+      "x-displayName": "Webhook Notifiers"
     }
   ]
 }
