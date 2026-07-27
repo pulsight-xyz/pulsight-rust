@@ -1728,6 +1728,14 @@
             }
           },
           {
+            "description": "Scope of an unpinned chart (lineage|pool; default lineage). lineage merges a graduated token's bonding curve with the pool it migrated to so it charts as one continuous market; pool reads the single dominant pool. Ignored when `pool` is set.",
+            "in": "query",
+            "name": "market",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Price denomination (native|sol|usd; default native)",
             "in": "query",
             "name": "quote",
@@ -4080,16 +4088,6 @@
               }
             }
           },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -5741,6 +5739,10 @@
             "description": "Source ∈ {\"observed\",\"inferred\"} (CHECK constraint).",
             "type": "string"
           },
+          "source_pool": {
+            "description": "SourcePool is the bonding-curve pool the mint traded on BEFORE\ngraduating. Together with DestinationPool it is the mint's market\nlineage — the pools /api/ohlcv merges into one continuous chart when\nno pool is pinned. Empty when unknown (rows predating\ncarbon-aggregator CH migration 000073, or a venue whose migration ix\ndoesn't expose the curve); treat '' as \"no pre-graduation side\".",
+            "type": "string"
+          },
           "timestamp": {
             "type": "string"
           },
@@ -6515,6 +6517,10 @@
       },
       "pulsight_internal_core_domain_credit.Transaction": {
         "properties": {
+          "api_key_id": {
+            "description": "APIKeyID attributes a metered consume to the api token that caused\nit. nil for interactive sessions, OAuth callers, admin adjustments\nand period grants — and for every row written before changeset 079.",
+            "type": "string"
+          },
           "created_at": {
             "type": "string"
           },
@@ -7580,7 +7586,7 @@
       "pulsight_internal_core_usecases_backtest.BacktestSummary": {
         "properties": {
           "copies_skipped_unpriced": {
-            "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap carried no post-swap price\n— so no honest fill price exists for them and they were NOT traded.\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. It is dominated by venues whose\ndecoder emits no marginal price (every Meteora DLMM leg, and every\nDAMM v2 / DBC leg ingested before those decoders were fixed), so a\nlaunch-sniping mirror over historical data can skip most of its entries\nwhile a PumpSwap mirror skips none. Surfaced so a mostly-skipped run\nreads as \"not enough data\" instead of quietly looking like a thin\nstrategy. Additive JSONB field — pre-existing rows decode as 0.",
+            "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap could not be priced honestly\n— so they were NOT traded. Two causes, both data-side:\n\n  1. no post-swap price on the leg at all (every Meteora DLMM leg, and\n     every DAMM v2 / DBC leg ingested before those decoders were fixed);\n  2. a leg whose reserve is impossible for a post-swap snapshot, which\n     means it is a PRE-swap one and its price is the pre-swap price\n     (PumpSwap — see postSwapReserveConsistent).\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. Cause 1 makes a launch-sniping\nmirror over historical data skip most of its entries; cause 2 fires on\nexactly the large launch buys such a strategy targets. Surfaced so a\nmostly-skipped run reads as \"not enough data\" instead of quietly looking\nlike a thin strategy — or worse, than being filled at a fictional price\nand looking profitable. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "ending_balance_sol": {
