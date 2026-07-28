@@ -168,7 +168,7 @@
               }
             }
           },
-          "description": "By-criteria scope + resolution window",
+          "description": "Token-selection source (def | strategy_id | legacy scope) + resolution window",
           "required": true
         },
         "responses": {
@@ -184,6 +184,16 @@
           },
           "400": {
             "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1831,6 +1841,38 @@
           "OHLCV"
         ],
         "operationId": "getOhlcv"
+      }
+    },
+    "/api/sol-price": {
+      "get": {
+        "description": "Returns USD per 1 SOL — the same volume-weighted WSOL/USDC reference the token catalog prices market caps and USD candles with, so displayed figures agree with computed ones. `sol_usd` is `null` when the reference is unavailable (cold analytics store, or no WSOL/USDC trade in the lookback window); it is never `0`.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.solPriceResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the SOL/USD reference rate",
+        "tags": [
+          "Market"
+        ],
+        "operationId": "getSolPrice"
       }
     },
     "/api/strategies": {
@@ -4884,8 +4926,14 @@
       },
       "internal_adapters_primary_http_handler.pickTokensRequest": {
         "properties": {
+          "def": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
+          },
           "scope": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScope"
+          },
+          "strategy_id": {
+            "type": "string"
           },
           "time_range": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TimeRange"
@@ -5012,6 +5060,14 @@
           },
           "trader": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.solPriceResponse": {
+        "properties": {
+          "sol_usd": {
+            "type": "number"
           }
         },
         "type": "object"
@@ -6694,6 +6750,14 @@
           },
           "exit": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.SubGraph"
+          },
+          "selection": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.SubGraph"
+              }
+            ],
+            "description": "Selection is the token-universe plane: a boolean tree of selection\npredicates rooted at a single Universe node. nil (or empty) ⇒ the\nstrategy does not describe its own universe — it needs mirror\nwallets or an explicit run-time scope."
           }
         },
         "type": "object"
@@ -7890,7 +7954,7 @@
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScopeKind"
           },
           "max_mints": {
-            "description": "MirrorsTraded + TraderTraded + Standalone (cap on selected mints).",
+            "description": "MaxMints — on a Strategy scope this is STAMPED BY THE RUNNER at submit\n(from the def's Universe node / mirror default) so the tick-budget and\ncredit math have a mint bound; requests don't set it. Legacy kinds\ncarried it on the wire.",
             "type": "integer"
           },
           "mint": {
@@ -7909,7 +7973,7 @@
             "type": "string"
           },
           "trader": {
-            "description": "TraderTraded only.",
+            "description": "Legacy TraderTraded only.",
             "type": "string"
           },
           "window": {
@@ -7918,13 +7982,14 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TimeRange"
               }
             ],
-            "description": "Standalone only — the point-in-time selection window + the\ninclude / exclude (\"unselect\") predicate filters."
+            "description": "Legacy Standalone only — kept so old rows round-trip and the\npick-tokens legacy form parses."
           }
         },
         "type": "object"
       },
       "pulsight_internal_core_usecases_backtest.TokenScopeKind": {
         "enum": [
+          "strategy",
           "single_mint",
           "mints",
           "mirrors_traded",
@@ -7933,6 +7998,7 @@
         ],
         "type": "string",
         "x-enum-varnames": [
+          "TokenScopeStrategy",
           "TokenScopeSingleMint",
           "TokenScopeMints",
           "TokenScopeMirrorsTraded",
@@ -7945,14 +8011,16 @@
           "copy_buy",
           "copy_sell",
           "emit_buy",
-          "emit_sell"
+          "emit_sell",
+          "scope_exit"
         ],
         "type": "string",
         "x-enum-varnames": [
           "TradeSourceCopyBuy",
           "TradeSourceCopySell",
           "TradeSourceEmitBuy",
-          "TradeSourceEmitSell"
+          "TradeSourceEmitSell",
+          "TradeSourceScopeExit"
         ]
       },
       "pulsight_internal_core_usecases_trader.DailyProfitEntry": {
@@ -8400,6 +8468,10 @@
     {
       "name": "Credits",
       "x-displayName": "Credits"
+    },
+    {
+      "name": "Market",
+      "x-displayName": "Market"
     },
     {
       "name": "Mints",
