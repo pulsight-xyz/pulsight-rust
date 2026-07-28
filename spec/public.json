@@ -168,7 +168,7 @@
               }
             }
           },
-          "description": "Token-selection source (def | strategy_id | legacy scope) + resolution window",
+          "description": "Token-selection source (def | strategy_id) + resolution window",
           "required": true
         },
         "responses": {
@@ -4929,9 +4929,6 @@
           "def": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
           },
-          "scope": {
-            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScope"
-          },
           "strategy_id": {
             "type": "string"
           },
@@ -6601,23 +6598,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_strategy.ComparisonOp": {
-        "enum": [
-          "gt",
-          "gte",
-          "lt",
-          "lte",
-          "eq"
-        ],
-        "type": "string",
-        "x-enum-varnames": [
-          "ComparisonGt",
-          "ComparisonGte",
-          "ComparisonLt",
-          "ComparisonLte",
-          "ComparisonEq"
-        ]
-      },
       "pulsight_internal_core_domain_strategy.Edge": {
         "properties": {
           "from": {
@@ -6645,23 +6625,6 @@
           "EdgePortCond",
           "EdgePortThen",
           "EdgePortElse"
-        ]
-      },
-      "pulsight_internal_core_domain_strategy.EventKind": {
-        "enum": [
-          "freeze_renounced",
-          "mint_renounced",
-          "lp_burned",
-          "dev_sold",
-          "honeypot"
-        ],
-        "type": "string",
-        "x-enum-varnames": [
-          "EventFreezeRenounced",
-          "EventMintRenounced",
-          "EventLpBurned",
-          "EventDevSold",
-          "EventHoneypot"
         ]
       },
       "pulsight_internal_core_domain_strategy.GlobalConstraints": {
@@ -7778,39 +7741,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_usecases_backtest.EventPredicate": {
-        "properties": {
-          "event": {
-            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.EventKind"
-          },
-          "negate": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_usecases_backtest.MetricPredicate": {
-        "properties": {
-          "metric": {
-            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.SelectionMetric"
-          },
-          "op": {
-            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ComparisonOp"
-          },
-          "value": {
-            "type": "number"
-          },
-          "window": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.SelectionMetricWindow"
-              }
-            ],
-            "description": "Window — optional trailing window ending at the selection `to`. Ignored\nfor liquidity_sol (always the latest reserve)."
-          }
-        },
-        "type": "object"
-      },
       "pulsight_internal_core_usecases_backtest.PreviewMarker": {
         "properties": {
           "pool_sol_at_trigger": {
@@ -7871,55 +7801,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_usecases_backtest.SelectionFilter": {
-        "properties": {
-          "events": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.EventPredicate"
-            },
-            "type": "array"
-          },
-          "metrics": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.MetricPredicate"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_usecases_backtest.SelectionMetric": {
-        "enum": [
-          "liquidity_sol",
-          "volume_sol",
-          "price_change_pct",
-          "swap_count"
-        ],
-        "type": "string",
-        "x-enum-varnames": [
-          "SelMetricLiquiditySol",
-          "SelMetricVolumeSol",
-          "SelMetricPriceChangePct",
-          "SelMetricSwapCount"
-        ]
-      },
-      "pulsight_internal_core_usecases_backtest.SelectionMetricWindow": {
-        "enum": [
-          "5m",
-          "30m",
-          "1h",
-          "6h",
-          "12h"
-        ],
-        "type": "string",
-        "x-enum-varnames": [
-          "SelWindow5m",
-          "SelWindow30m",
-          "SelWindow1h",
-          "SelWindow6h",
-          "SelWindow12h"
-        ]
-      },
       "pulsight_internal_core_usecases_backtest.Side": {
         "enum": [
           "buy",
@@ -7944,17 +7825,11 @@
       },
       "pulsight_internal_core_usecases_backtest.TokenScope": {
         "properties": {
-          "exclude": {
-            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.SelectionFilter"
-          },
-          "include": {
-            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.SelectionFilter"
-          },
           "kind": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TokenScopeKind"
           },
           "max_mints": {
-            "description": "MaxMints — on a Strategy scope this is STAMPED BY THE RUNNER at submit\n(from the def's Universe node / mirror default) so the tick-budget and\ncredit math have a mint bound; requests don't set it. Legacy kinds\ncarried it on the wire.",
+            "description": "MaxMints — on a Strategy scope this is STAMPED BY THE RUNNER at submit\n(from the def's Universe node / mirror default) so the tick-budget and\ncredit math have a mint bound; requests don't set it. Legacy kinds\ncarried it on the wire. (The other legacy payload fields — trader,\nwindow, include/exclude filters — were dropped 2026-07-28 with the\nstandalone resolution path; unknown keys on old persisted rows are\nignored on decode, so tolerant reads are unaffected.)",
             "type": "integer"
           },
           "mint": {
@@ -7971,18 +7846,6 @@
           "pool": {
             "description": "Pool optionally pins a SingleMint run to one specific market (the AMM\npool pubkey) of the mint. Empty ⇒ the candle source resolves the mint's\ndominant pool within the replay window (the historical default). Only\nvalid on the SingleMint variant — a pool belongs to exactly one mint, so\nit is meaningless on a multi-mint / dynamic scope. Mirrors the preview's\nPreviewRequest.Pool so a pinned run replays the same market the builder\npreviewed.",
             "type": "string"
-          },
-          "trader": {
-            "description": "Legacy TraderTraded only.",
-            "type": "string"
-          },
-          "window": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TimeRange"
-              }
-            ],
-            "description": "Legacy Standalone only — kept so old rows round-trip and the\npick-tokens legacy form parses."
           }
         },
         "type": "object"
