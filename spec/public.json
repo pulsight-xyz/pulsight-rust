@@ -2374,7 +2374,7 @@
     },
     "/api/swaps": {
       "get": {
-        "description": "Returns swaps filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. All time params are optional; with none supplied the latest swaps are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest swaps strictly older than the cursor — no lower bound, so pagination crosses activity gaps).",
+        "description": "Returns swaps filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. `pool` narrows to one or more markets and accepts the same repeated/comma-separated forms, OR-combined — pass the whole set when a token's market spans several pools (a graduated token's bonding curve plus the pool it migrated to). All time params are optional; with none supplied the latest swaps are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest swaps strictly older than the cursor — no lower bound, so pagination crosses activity gaps).",
         "parameters": [
           {
             "description": "Mint pubkey (optional; combinable with trader)",
@@ -2393,7 +2393,7 @@
             }
           },
           {
-            "description": "Market (pool pubkey) to scope swaps to (optional)",
+            "description": "Market (pool pubkey) to scope swaps to; repeatable or comma-separated, OR-combined (optional)",
             "in": "query",
             "name": "pool",
             "schema": {
@@ -5191,11 +5191,22 @@
       },
       "internal_adapters_primary_http_handler.tokensRow": {
         "properties": {
+          "arb_tx_count": {
+            "description": "Distinct is_arb transactions on this (trader, mint). Shown alongside\nbuy/sell, never subtracted from them -- an arb still emits a buy row,\na sell row or both. It exists because those counts otherwise read as\nbroken on arbitrage wallets: a multi-hop arb bridging through a\nnon-quote token has its target buy leg quoted in that token, which is\nnot a registry quote, so only the quote-anchored sell reaches `swaps`.\n0 on the legacy Pnl path, which has no arb data -- the frontend hides\nthe segment at 0.",
+            "type": "integer"
+          },
           "buy_tx_count": {
             "type": "integer"
           },
           "cost_basis_lamports": {
             "type": "string"
+          },
+          "directional_buy_tx_count": {
+            "description": "Disjoint from ArbTxCount: these EXCLUDE arbitrage rows, so the UI shows\ndirectional buys / directional sells / arb txs without the three\noverlapping. 0 on the legacy Pnl path.",
+            "type": "integer"
+          },
+          "directional_sell_tx_count": {
+            "type": "integer"
           },
           "first_buy_ts": {
             "type": "string"
@@ -5956,11 +5967,22 @@
       },
       "pulsight_internal_core_domain_aggregator.MintTraderRow": {
         "properties": {
+          "arb_tx_count": {
+            "description": "Distinct is_arb transactions for this (trader, mint). Same rationale\nas TraderTokenPosition.ArbTxCount: shown alongside buy/sell, never\nsubtracted, so lopsided counts on arbitrage wallets are legible.",
+            "type": "integer"
+          },
           "buy_tx_count": {
             "type": "integer"
           },
           "cost_basis_lamports": {
             "type": "string"
+          },
+          "directional_buy_tx_count": {
+            "description": "Directional counts EXCLUDE arbitrage rows, so the three numbers the UI\nshows are disjoint: directional buys / directional sells / arb txs.\nOverlapping them is what made an arb wallet read \"11 buys / 2 sells /\n11 arb\" -- every one of those buys WAS one of the arbs. A pure\narbitrageur now reads 0 / 0 / N, which is the truth: it never took a\ndirectional position in the token.\n\nbuy_tx_count / sell_tx_count keep their original meaning (all rows,\nmatching the trader_token_stats rollup that the leaderboard and its\n`f=` filters read) so nothing downstream shifts under them.",
+            "type": "integer"
+          },
+          "directional_sell_tx_count": {
+            "type": "integer"
           },
           "first_buy_ts": {
             "type": "string"
