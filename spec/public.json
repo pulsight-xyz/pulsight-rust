@@ -4303,16 +4303,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -5231,6 +5221,13 @@
           },
           "mint_symbol": {
             "type": "string"
+          },
+          "pool_liquidity": {
+            "type": "string"
+          },
+          "pool_quote_reserves": {
+            "description": "Rug-aware effective quote reserves of the mint's pool (lamports) and the\nexitability tier derived from them server-side. Together they let the row\nexplain WHY a bag marks at ~0. null / \"\" mean unknown -- which is what\nthe legacy Pnl fallback path below always reports, since it has no pool\ndata; the frontend renders no badge rather than a false rug.",
+            "type": "number"
           },
           "realized_profit": {
             "type": "number"
@@ -6662,6 +6659,10 @@
             "type": "integer"
           },
           "max_buys_per_token_per_minute": {
+            "type": "integer"
+          },
+          "max_concurrent_tokens": {
+            "description": "MaxConcurrentTokens caps how many tokens the strategy may hold at\nonce, OVERRIDING the Token Selection root's MaxMints when set. Three\nstates, because \"not set\" and \"unlimited\" are different answers:\n\n  nil       ⇒ inherit — the Token Selection cap, or\n              DefaultUniverseMaxMints for a def with no selection\n              plane. Every def written before this field existed reads\n              this way, so adding it changed no existing strategy.\n  &0        ⇒ unlimited.\n  &n        ⇒ n, whatever the Token Selection root says.\n\nResolve it through StrategyDef.ConcurrencyCap — inheritance needs the\nselection plane, so the constraint alone cannot answer.\n\nIt is a POINTER on purpose: `uint32` + omitempty serializes an explicit\n0 as absent, which would silently turn \"unlimited\" back into \"inherit\"\n(the tightest cap) on every round-trip through the JSONB column.",
             "type": "integer"
           },
           "max_position_exposure_sol": {
