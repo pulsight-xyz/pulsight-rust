@@ -123,7 +123,7 @@
     },
     "/api/backtests/limits": {
       "get": {
-        "description": "Returns the per-run backtest cost ceiling (max credits per run) so clients can show and pre-check it.",
+        "description": "Returns the per-run backtest cost ceiling (max credits per run) and the per-timeframe maximum run window in seconds, so clients can show and pre-check them. An absent timeframe is unlimited; admins are exempt.",
         "responses": {
           "200": {
             "description": "OK",
@@ -4885,6 +4885,12 @@
         "properties": {
           "max_tick_budget": {
             "type": "integer"
+          },
+          "max_window_secs": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
           }
         },
         "type": "object"
@@ -7664,6 +7670,10 @@
           },
           "our_median_price_impact_pct": {
             "type": "number"
+          },
+          "per_pool": {
+            "description": "PerPool records whether the run simulated each market as an INDEPENDENT\ninstrument (req.PerPool). It is persisted because it is the LEDGER\nBOUNDARY, and a reader cannot recover it from the trades: per-pool\nfidelity stamps every fill with the pool it priced against in EVERY mode,\nso a token that graduates mid-window (bonding curve → PumpSwap) carries\ntwo pools on ONE merged ledger and looks exactly like two independent\ninstruments. The result page's per-token rollup used to guess from that\nstamp and split a graduating token in two — the buys on a row reading\n0.000, the realizing sells and all of the profit on another. Additive\nJSONB field; pre-existing rows decode as false, which is what all but an\nopt-in run was.",
+            "type": "boolean"
           },
           "realized_pnl_sol": {
             "type": "number"
