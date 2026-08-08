@@ -1793,7 +1793,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.OHLCVCandle"
+                    "$ref": "#/components/schemas/internal_adapters_primary_http_handler.ohlcvRow"
                   },
                   "type": "array"
                 }
@@ -3994,6 +3994,70 @@
         "operationId": "getTradersByWalletAddressCreatedTokens"
       }
     },
+    "/api/traders/{walletAddress}/neighbours": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Wallet address",
+            "in": "path",
+            "name": "walletAddress",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "before|same_slot|after",
+            "in": "query",
+            "name": "rel",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "buy|sell",
+            "in": "query",
+            "name": "plane",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lookback in days (1-14)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Max rows (1-50)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.traderNeighborsResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Wallets seen trading just before / after a trader",
+        "tags": [
+          "Traders"
+        ],
+        "operationId": "getTradersByWalletAddressNeighbours"
+      }
+    },
     "/api/traders/{walletAddress}/pnl-series": {
       "get": {
         "description": "Returns daily realised PnL points (oldest first) for a trader, sourced from the aggregator's `trader_daily_pnl_series` SQL function.",
@@ -4920,6 +4984,91 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.neighborRowResponse": {
+        "properties": {
+          "follow_rate": {
+            "type": "number"
+          },
+          "hits": {
+            "type": "integer"
+          },
+          "med_slot_delta": {
+            "type": "integer"
+          },
+          "mutual_rate": {
+            "type": "number"
+          },
+          "neighbor_entries": {
+            "type": "integer"
+          },
+          "stats": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.neighborStatsResponse"
+              }
+            ],
+            "description": "Stats is the neighbour's own 30d record. Omitted entirely when unknown\n— a wallet with no activity in the window, or a failed stats read. The\nclient renders that as \"—\", never as zeroes."
+          },
+          "wallet": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.neighborStatsResponse": {
+        "properties": {
+          "realized_pnl_lamports": {
+            "description": "LAMPORTS — named for the unit, unlike the TraderStats field it comes from.",
+            "type": "number"
+          },
+          "realized_roi_pct": {
+            "type": "number"
+          },
+          "winrate": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.ohlcvRow": {
+        "properties": {
+          "buy_volume_sol": {
+            "type": "number"
+          },
+          "close": {
+            "type": "number"
+          },
+          "high": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "open": {
+            "type": "number"
+          },
+          "pool_sol": {
+            "type": "number"
+          },
+          "sell_volume_sol": {
+            "type": "number"
+          },
+          "swap_count": {
+            "type": "integer"
+          },
+          "time": {
+            "type": "integer"
+          },
+          "token_volume": {
+            "type": "number"
+          },
+          "volume_sol": {
+            "description": "buy + sell",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.pickTokensRequest": {
         "properties": {
           "def": {
@@ -5255,6 +5404,35 @@
           },
           "updated_at": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.traderNeighborsResponse": {
+        "properties": {
+          "neighbors": {
+            "items": {
+              "$ref": "#/components/schemas/internal_adapters_primary_http_handler.neighborRowResponse"
+            },
+            "type": "array"
+          },
+          "plane": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "subject_entries": {
+            "type": "integer"
+          },
+          "trader": {
+            "type": "string"
+          },
+          "window_days": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6085,44 +6263,6 @@
           },
           "stats": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintStatsByWindow"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_domain_aggregator.OHLCVCandle": {
-        "properties": {
-          "bucket": {
-            "type": "string"
-          },
-          "buy_volume_sol": {
-            "type": "number"
-          },
-          "c": {
-            "type": "number"
-          },
-          "h": {
-            "type": "number"
-          },
-          "l": {
-            "type": "number"
-          },
-          "mint": {
-            "type": "string"
-          },
-          "o": {
-            "type": "number"
-          },
-          "pool_sol": {
-            "type": "number"
-          },
-          "sell_volume_sol": {
-            "type": "number"
-          },
-          "swap_count": {
-            "type": "integer"
-          },
-          "token_volume": {
-            "type": "number"
           }
         },
         "type": "object"
@@ -7674,6 +7814,10 @@
           "per_pool": {
             "description": "PerPool records whether the run simulated each market as an INDEPENDENT\ninstrument (req.PerPool). It is persisted because it is the LEDGER\nBOUNDARY, and a reader cannot recover it from the trades: per-pool\nfidelity stamps every fill with the pool it priced against in EVERY mode,\nso a token that graduates mid-window (bonding curve → PumpSwap) carries\ntwo pools on ONE merged ledger and looks exactly like two independent\ninstruments. The result page's per-token rollup used to guess from that\nstamp and split a graduating token in two — the buys on a row reading\n0.000, the realizing sells and all of the profit on another. Additive\nJSONB field; pre-existing rows decode as false, which is what all but an\nopt-in run was.",
             "type": "boolean"
+          },
+          "positions_opened_unmarked": {
+            "description": "PositionsOpenedUnmarked counts positions the run opened while it had NO\nprice to mark them with — so for as long as that lasted, every\nprice-based exit rule (take-profit, stop, trailing stop, max-drawdown)\nevaluated as undefined and could not fire.\n\nIt happens because a copy fills at the price the TARGET left behind, on\nthe pool THEY traded, while the position is marked against the run's own\ncandle stream. Normally those are the same market. They are not when the\nfill lands somewhere the stream does not cover — a parallel venue, or a\nmarket whose candles simply have not started yet.\n\nLike CopiesSkippedUnpriced this is a COVERAGE number, not a result: an\nexit rule that could not be evaluated did not decline to fire, it never\nran, and the position rode on until something else closed it. A non-zero\nvalue means the run UNDER-represents its own exit rules — read the ROI\nwith that in mind.\n\nMid-window graduations used to dominate this and no longer do: the\ncandle stream now merges a token's whole migration lineage, so a\nbonding-curve entry is marked from the moment it opens. Additive JSONB\nfield — old rows decode as 0.",
+            "type": "integer"
           },
           "realized_pnl_sol": {
             "type": "number"
