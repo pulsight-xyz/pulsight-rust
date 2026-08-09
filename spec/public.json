@@ -4189,6 +4189,56 @@
         "operationId": "getTradersByWalletAddressPnlSeries"
       }
     },
+    "/api/traders/{walletAddress}/price-impact": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Wallet address",
+            "in": "path",
+            "name": "walletAddress",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1d|7d|30d|all (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderPriceImpactStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Price impact of a wallet's own fills",
+        "tags": [
+          "Traders"
+        ],
+        "operationId": "getTradersByWalletAddressPriceImpact"
+      }
+    },
     "/api/traders/{walletAddress}/tips": {
       "get": {
         "parameters": [
@@ -6622,10 +6672,6 @@
           "avg_holding_time_secs": {
             "type": "number"
           },
-          "avg_price_impact_bps": {
-            "description": "Mean price impact of the wallet's own fills, in basis points.",
-            "type": "number"
-          },
           "avg_reactivity_secs": {
             "type": "number"
           },
@@ -6633,17 +6679,13 @@
             "type": "number"
           },
           "avg_trade_size_lamports": {
-            "description": "AvgTradeSizeLamports is TotalVolumeLamports over the window's swap\ncount — the wallet's typical clip. It is what makes the price-impact\nfigures below legible: impact is size against pool depth, so the two\nare read together.",
+            "description": "AvgTradeSizeLamports is TotalVolumeLamports over the window's swap\ncount — the wallet's typical clip. It is what makes the price-impact\nfigures legible: impact is size against pool depth, so the two are\nread together.",
             "type": "number"
           },
           "median_buy_count_per_token": {
             "type": "number"
           },
           "median_holding_time_secs": {
-            "type": "number"
-          },
-          "median_price_impact_bps": {
-            "description": "Median price impact of the wallet's own fills, in basis points.",
             "type": "number"
           },
           "median_reactivity_secs": {
@@ -6655,10 +6697,6 @@
           "oldest_trade_at": {
             "type": "string"
           },
-          "price_impact_swaps": {
-            "description": "Swap legs the two impact figures were measured over. 0 = not measured.",
-            "type": "integer"
-          },
           "profit_per_trade_lamports": {
             "type": "number"
           },
@@ -6669,7 +6707,7 @@
             "type": "number"
           },
           "total_volume_lamports": {
-            "description": "TotalVolumeLamports is the window's traded value in lamports, both\nsides. It reads the QUOTE side of each row (with non-WSOL quotes\nprojected through `swaps.quote_lamports`) — see the adapter's\nswapQuoteLamportsExpr for why a plain `sum(amount_in)` is not that.",
+            "description": "TotalVolumeLamports is the window's traded value, both sides, read as\nthe QUOTE side of each row — see the adapter's swapQuoteSideExpr for\nwhy a plain `sum(amount_in)` is not that, and for the one case it is\nstill approximate (non-WSOL quotes count in their own units).",
             "type": "integer"
           },
           "window": {
@@ -6739,6 +6777,28 @@
           },
           "winrate": {
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TraderPriceImpactStats": {
+        "properties": {
+          "avg_price_impact_bps": {
+            "description": "AvgBps is the mean and MedianBps the p50 over the window's measurable\nlegs. Both are reported because the population is heavy-tailed — a\nhandful of large fills into thin curves dominate the mean while the\nmedian describes the wallet's ordinary fill.\n\nPOINTERS, because 0 bps is a REAL answer (a wallet trading tiny size\ninto deep pools) and \"we could not measure it\" must not read as it.\nNil when Swaps is 0 — most often a wallet trading only concentrated\nliquidity, whose vault balances are not a curve.",
+            "type": "number"
+          },
+          "median_price_impact_bps": {
+            "type": "number"
+          },
+          "price_impact_swaps": {
+            "description": "Swaps is how many legs were measurable, and is what tells \"measured 0\"\napart from \"not measured\" on the wire.",
+            "type": "integer"
+          },
+          "pubkey": {
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
           }
         },
         "type": "object"
