@@ -3443,6 +3443,54 @@
         "operationId": "getTradersByWalletByWalletAddress"
       }
     },
+    "/api/traders/copyability": {
+      "post": {
+        "description": "For each wallet's fills, the price a copier filling N blocks later would have got — an entry/exit slippage curve and the share of the wallet's edge that survives. Latency is counted in SLOTS, since the stored swap timestamp resolves only to whole seconds. Measures PRICE TRANSFER, not PnL. Supply size_lamports to also get the EXECUTION half: the slippage band each fill needed (split signal-buy vs follow-on) and what each widening step buys, priced at the target's own exit.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.copyabilityRequest"
+              }
+            }
+          },
+          "description": "Wallets, window and slot ladder",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.copyabilityResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Copyability of a wallet set at simulated latencies",
+        "tags": [
+          "Traders"
+        ],
+        "operationId": "postTradersCopyability"
+      }
+    },
     "/api/traders/export": {
       "post": {
         "description": "Exports trader records based on advanced filters.",
@@ -4971,6 +5019,67 @@
             "type": "string"
           },
           "strategy_name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.copyabilityRequest": {
+        "properties": {
+          "delays_slots": {
+            "description": "Simulated latencies in SLOTS (blocks) behind the target. Omitted ⇒ the\ndefault ladder. Blocks rather than milliseconds because the stored swap\ntimestamp resolves only to whole seconds, so a sub-second ladder cannot\nbe answered — see domain/trader/copyability.go.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "from": {
+            "type": "string"
+          },
+          "size_lamports": {
+            "description": "OPTIONAL copier trade size in lamports. Supplying it attaches the\nexecution half — what slippage band each fill needed, and what each\nwidening step buys. Optional because a band is a threshold for a\nconcrete size against a concrete depth, while the price-transfer curve\nabove is deliberately unit-free; both come from one read either way.",
+            "type": "integer"
+          },
+          "to": {
+            "type": "string"
+          },
+          "wallets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "internal_adapters_primary_http_handler.copyabilityResponse": {
+        "properties": {
+          "bands_bps": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "delays_slots": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "from": {
+            "type": "string"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyabilityReport"
+            },
+            "type": "array"
+          },
+          "size_lamports": {
+            "description": "Echoed only when a size was supplied, alongside the band ladder the\nexecution half was evaluated on.",
+            "type": "integer"
+          },
+          "to": {
             "type": "string"
           }
         },
@@ -6513,16 +6622,28 @@
           "avg_holding_time_secs": {
             "type": "number"
           },
+          "avg_price_impact_bps": {
+            "description": "Mean price impact of the wallet's own fills, in basis points.",
+            "type": "number"
+          },
           "avg_reactivity_secs": {
             "type": "number"
           },
           "avg_sell_count_per_token": {
             "type": "number"
           },
+          "avg_trade_size_lamports": {
+            "description": "AvgTradeSizeLamports is TotalVolumeLamports over the window's swap\ncount — the wallet's typical clip. It is what makes the price-impact\nfigures below legible: impact is size against pool depth, so the two\nare read together.",
+            "type": "number"
+          },
           "median_buy_count_per_token": {
             "type": "number"
           },
           "median_holding_time_secs": {
+            "type": "number"
+          },
+          "median_price_impact_bps": {
+            "description": "Median price impact of the wallet's own fills, in basis points.",
             "type": "number"
           },
           "median_reactivity_secs": {
@@ -6534,6 +6655,10 @@
           "oldest_trade_at": {
             "type": "string"
           },
+          "price_impact_swaps": {
+            "description": "Swap legs the two impact figures were measured over. 0 = not measured.",
+            "type": "integer"
+          },
           "profit_per_trade_lamports": {
             "type": "number"
           },
@@ -6544,6 +6669,7 @@
             "type": "number"
           },
           "total_volume_lamports": {
+            "description": "TotalVolumeLamports is the window's traded value in lamports, both\nsides. It reads the QUOTE side of each row (with non-WSOL quotes\nprojected through `swaps.quote_lamports`) — see the adapter's\nswapQuoteLamportsExpr for why a plain `sum(amount_in)` is not that.",
             "type": "integer"
           },
           "window": {
@@ -6940,6 +7066,194 @@
           "TierThree",
           "TierEnterprise"
         ]
+      },
+      "pulsight_internal_core_domain_trader.CopyBandPoint": {
+        "properties": {
+          "band_bps": {
+            "type": "integer"
+          },
+          "fill_rate_pct": {
+            "type": "number"
+          },
+          "filled": {
+            "type": "integer"
+          },
+          "marginal_fills": {
+            "description": "Fills this rung adds over the previous (tighter) rung, and what they are\nworth priced at the target's own realised exit. This is the number the\nband decision turns on: a rung that adds fills at a negative return is\nbuying losses, however much it improves the fill rate.",
+            "type": "integer"
+          },
+          "marginal_pnl_pct": {
+            "type": "number"
+          },
+          "mean_entry_vs_target_bps": {
+            "description": "Mean execution price of the filled trades against the target's own fill\nprice. Positive is worse for the copier, matching copyability's sign.",
+            "type": "number"
+          },
+          "mean_pnl_pct": {
+            "description": "Expected return over everything filled at this band, same pricing.\nNULL when no filled trade has a priceable exit.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.CopyBandQuantiles": {
+        "properties": {
+          "fills": {
+            "type": "integer"
+          },
+          "max_bps": {
+            "type": "integer"
+          },
+          "p50_bps": {
+            "type": "integer"
+          },
+          "p75_bps": {
+            "type": "integer"
+          },
+          "p90_bps": {
+            "type": "integer"
+          },
+          "p95_bps": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.CopyDelayPoint": {
+        "properties": {
+          "delay_slots": {
+            "type": "integer"
+          },
+          "edge_retained_pct": {
+            "description": "Share of the target's edge left after paying the round-trip cost.\nNULL when the target's edge is not positive: you cannot \"retain\" a\nshare of an edge that is not there, and reporting 0% would read as\n\"latency destroyed it\" when latency was never the problem.",
+            "type": "number"
+          },
+          "entry_slippage_bps": {
+            "description": "Positive is ALWAYS worse for the copier, on both sides: a buy filled\nhigher than the target's, a sell filled lower.",
+            "type": "number"
+          },
+          "execution": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionAtDelay"
+              }
+            ],
+            "description": "Present only when the caller supplied a trade size: what band this\nlatency needs and what each widening step buys. See copyexecution.go."
+          },
+          "exit_slippage_bps": {
+            "type": "number"
+          },
+          "measured_fills": {
+            "type": "integer"
+          },
+          "round_trip_cost_bps": {
+            "type": "number"
+          },
+          "target_edge_bps": {
+            "description": "The target's own gross round-trip return over the same fills, so the\ncomparison below is self-consistent — one price source, one window.",
+            "type": "number"
+          },
+          "unmeasurable_fills": {
+            "description": "Fills with no trade to copy into at this latency.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.CopyExecutionAtDelay": {
+        "properties": {
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandPoint"
+            },
+            "type": "array"
+          },
+          "in_block_move_bps": {
+            "description": "Where the adverse move comes from. `InBlockSharePct` is the share of the\ntotal move that had already happened by the end of the target's OWN\nblock — i.e. from the copy wave the target's trade set off, not from\nlatency. Only populated when the ladder includes slot 0.",
+            "type": "number"
+          },
+          "in_block_share_pct": {
+            "type": "number"
+          },
+          "measured_fills": {
+            "type": "integer"
+          },
+          "required": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandQuantiles"
+              }
+            ],
+            "description": "Required band, split because the population is bimodal."
+          },
+          "required_follow_on": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandQuantiles"
+          },
+          "required_signal_buy": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandQuantiles"
+          },
+          "total_move_bps": {
+            "type": "number"
+          },
+          "unmeasurable_fills": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.CopyExecutionSummary": {
+        "properties": {
+          "exits_unpriced": {
+            "type": "integer"
+          },
+          "fills": {
+            "type": "integer"
+          },
+          "follow_ons": {
+            "type": "integer"
+          },
+          "median_pool_quote_lamports": {
+            "description": "Context that explains the numbers: how deep the pools are when this\nwallet buys, and how hard its own buy hits them.",
+            "type": "integer"
+          },
+          "median_target_impact_bps": {
+            "type": "number"
+          },
+          "signal_buys": {
+            "type": "integer"
+          },
+          "size_lamports": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.CopyabilityReport": {
+        "properties": {
+          "delays": {
+            "description": "Never nil on the wire: an empty curve is [], not null.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyDelayPoint"
+            },
+            "type": "array"
+          },
+          "execution_summary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionSummary"
+              }
+            ],
+            "description": "Present only when the caller supplied a trade size."
+          },
+          "round_trip_mints": {
+            "description": "Positions (mints) that had BOTH a buy and a sell in the window — the\nonly ones a round-trip cost can be measured on.",
+            "type": "integer"
+          },
+          "wallet": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "pulsight_internal_core_domain_trader.DailyProfit": {
         "properties": {
