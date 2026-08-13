@@ -1054,7 +1054,7 @@
     },
     "/api/mints/{pubkey}/markets": {
       "get": {
-        "description": "Returns per-(pool, dex) rollup with SOL-volume share (0..1) for a single mint over the requested window. `window=all` lists every market the mint ever traded on — use it to resolve markets for tokens with no recent activity.",
+        "description": "Returns per-(pool, dex) rollup with SOL-volume share (0..1) for a single mint over the requested window. `window=all` lists every market the mint ever traded on — use it to resolve markets for tokens with no recent activity. At most one pool carries `is_default: true` (window-independent): the mint's default market, the same pool an unpinned `/api/ohlcv` chart resolves to. An idle default market may be absent from short-window listings, so resolve defaults from `window=all`.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1730,7 +1730,7 @@
             }
           },
           {
-            "description": "Market (pool pubkey) to chart; defaults to the most active pool",
+            "description": "Market (pool pubkey) to chart; defaults to the mint's default market (lifetime-dominant pool, preferring the currently-active one on a genuine market rotation) — so tokens idle past 24h still chart. The default pool carries is_default on /api/mints/{pubkey}/markets",
             "in": "query",
             "name": "pool",
             "schema": {
@@ -6106,6 +6106,10 @@
         "properties": {
           "dex": {
             "type": "string"
+          },
+          "is_default": {
+            "description": "IsDefault marks the mint's default market — the pool an unpinned\n/api/ohlcv chart resolves to (lifetime-dominant, recency-aware; one\ndefinition, server-side: defaultMarketPool). Resolved independently\nof the requested window, so a listing may carry no flagged row when\nthe default market is idle (short windows) or older than swap\nretention. Resolve defaults from `window=all`.",
+            "type": "boolean"
           },
           "last_swap_ts": {
             "type": "string"
