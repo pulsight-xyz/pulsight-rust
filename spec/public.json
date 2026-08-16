@@ -1973,6 +1973,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6249,6 +6259,13 @@
           "name": {
             "type": "string"
           },
+          "price_sparkline": {
+            "description": "PriceSparkline is the mint's last-24h price shape: WSOL-quoted closes\nbucketed at priceSparklineBucketMin, oldest→newest, at most\npriceSparklineMaxPoints values. It rides the SAME scan as PriceUsd, so\nit carries the same denomination caveat: WSOL-quoted only, which is why\na USDC-only mint has none rather than a series in another unit (mixing\nquotes would draw a step that never happened). Values are raw SOL per\nwhole token — the client normalises to its own min/max, so the unit only\nhas to be CONSISTENT within the series. Omitted below 2 points: one\npoint is not a line, and a listing-wide 24h span is what makes the shape\ncomparable row to row (a mint minutes old legitimately has none yet).",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
           "price_usd": {
             "description": "PriceUsd is the latest price per WHOLE token in USD, derived from the\ndominant WSOL-quoted OHLCV close × the SOL/USD reference rate. nil\nwhen there's no WSOL pool, decimals are unknown, or no SOL/USD ref.",
             "type": "number"
@@ -7912,6 +7929,10 @@
             "type": "boolean"
           },
           "max_filters": {
+            "type": "integer"
+          },
+          "max_strategies": {
+            "description": "MaxStrategies is the strategy cap, 0 meaning UNLIMITED (see\nsubscription.PlanLimits.MaxStrategies). It carries the admin's\n`tier_plan_limits` override, not the compiled-in default.",
             "type": "integer"
           },
           "max_webhooks": {
