@@ -2329,58 +2329,6 @@
         "operationId": "getTipsHeatmap"
       }
     },
-    "/api/tips/leaderboard/jito-efficiency": {
-      "get": {
-        "parameters": [
-          {
-            "description": "Window (30m|1h|12h|1d|7d|30d|all)",
-            "in": "query",
-            "name": "window",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Row cap (1..200, default 50)",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.JitoEfficiencyRow"
-                  },
-                  "type": "array"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Jito-efficiency leaderboard",
-        "tags": [
-          "Tips"
-        ],
-        "operationId": "getTipsLeaderboardJitoEfficiency"
-      }
-    },
     "/api/tips/mat": {
       "get": {
         "parameters": [
@@ -5640,33 +5588,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_aggregator.JitoEfficiencyRow": {
-        "properties": {
-          "efficiency_score": {
-            "type": "number"
-          },
-          "label": {
-            "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the trader isn't labelled.",
-            "type": "string"
-          },
-          "label_type": {
-            "type": "string"
-          },
-          "tip_swaps": {
-            "type": "integer"
-          },
-          "total_tip_sum": {
-            "type": "integer"
-          },
-          "total_volume_in": {
-            "type": "integer"
-          },
-          "trader": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "pulsight_internal_core_domain_aggregator.LpEvent": {
         "properties": {
           "base_amount": {
@@ -7572,6 +7493,10 @@
       },
       "pulsight_internal_core_ports_input.SubscriptionInfo": {
         "properties": {
+          "cancel_at": {
+            "description": "CancelAt is set while the provider-linked subscription is scheduled to\ncancel at the end of the paid period (status stays \"active\"; the user\ncan resume). Absent when renewing normally or already canceled.",
+            "type": "string"
+          },
           "expires_at": {
             "type": "string"
           },
