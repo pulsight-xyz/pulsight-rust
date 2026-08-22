@@ -3920,6 +3920,56 @@
         "operationId": "getTradersByWalletAddressPriceImpact"
       }
     },
+    "/api/traders/{walletAddress}/reliability": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Wallet address",
+            "in": "path",
+            "name": "walletAddress",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1d|7d|30d|all (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderReliabilityStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Landed-vs-failed reliability of a wallet's transactions",
+        "tags": [
+          "Traders"
+        ],
+        "operationId": "getTradersByWalletAddressReliability"
+      }
+    },
     "/api/traders/{walletAddress}/tips": {
       "get": {
         "parameters": [
@@ -6389,10 +6439,18 @@
             "description": "DidntBuySells / SoldGtBoughtSells count the window's uncovered\nsells: countIf(sold_without_buy) and countIf(sold_more_than_bought)\nover `swaps`. Replaces the retired phantom proceeds split (CA\nmigration 000018_remove_phantom_tracking).",
             "type": "integer"
           },
+          "failed_cost_lamports": {
+            "description": "FailedCostLamports — fees burned on failed venue-mentioning txs plus\nthe fees+tips of landed no-CPI arb probes, from the failed-tx rollups\n(CA 000094). 0 when the ledger isn't populated for the window.",
+            "type": "integer"
+          },
           "loss_profit": {
             "type": "integer"
           },
           "loss_sells": {
+            "type": "integer"
+          },
+          "net_realized_profit": {
+            "description": "NetRealizedProfit = RealizedProfit − TotalFees − TotalTips −\nFailedCostLamports: what the wallet actually kept. This is the\nHEADLINE PnL; RealizedProfit stays as the flat/gross component.",
             "type": "integer"
           },
           "realized_profit": {
@@ -6415,9 +6473,14 @@
             "type": "integer"
           },
           "total_fees": {
+            "description": "TotalFees is the window's tx fees (base + priority) counted ONCE PER\nTRANSACTION: sum(priority_fee_lamports) + 5000 × uniq(signature).\n`swaps.fee` itself is stamped on every trade row of a tx, so the old\nsumIf(fee) double-counted multi-trade (arb) txs; priority/tips are\nfirst-row-only stamped, so their plain sums are exact and only the\n5000-lamport base rides the (near-exact) uniq count.",
             "type": "integer"
           },
           "total_sells": {
+            "type": "integer"
+          },
+          "total_tips": {
+            "description": "TotalTips — builder/MEV tips paid on the window's successful txs.",
             "type": "integer"
           },
           "trader": {
@@ -6453,6 +6516,54 @@
           },
           "pubkey": {
             "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TraderReliabilityStats": {
+        "properties": {
+          "failed_arbs": {
+            "type": "integer"
+          },
+          "failed_fee_lamports": {
+            "description": "Lamports burned on failed txs (base + priority fee) vs on landed\nno-CPI probes, plus tips the probes paid.",
+            "type": "integer"
+          },
+          "failed_other": {
+            "type": "integer"
+          },
+          "failed_swaps": {
+            "type": "integer"
+          },
+          "failed_txs": {
+            "description": "= FailedSwaps + FailedArbs + FailedOther",
+            "type": "integer"
+          },
+          "landed_txs": {
+            "description": "LandedTxs is uniqExact(signature) over the wallet's `swaps` rows in\nthe window — successful swap TRANSACTIONS, not legs or trades.",
+            "type": "integer"
+          },
+          "no_cpi_fee_lamports": {
+            "type": "integer"
+          },
+          "no_cpi_tip_lamports": {
+            "type": "integer"
+          },
+          "no_cpi_txs": {
+            "type": "integer"
+          },
+          "pubkey": {
+            "type": "string"
+          },
+          "spam_rate": {
+            "type": "number"
+          },
+          "success_rate": {
+            "description": "SuccessRate = LandedTxs / (LandedTxs + FailedTxs); SpamRate =\n(FailedTxs + NoCpiTxs) / (LandedTxs + FailedTxs + NoCpiTxs).\nPOINTERS: nil when the denominator is 0 — a wallet with no activity\nhas no rate, and that must not read as 0%.",
+            "type": "number"
           },
           "window": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
@@ -7100,7 +7211,6 @@
             "type": "number"
           },
           "avg_realized_profit_7d": {
-            "description": "Realized profit per-mint averages / medians. UNIT: lamports\n(frontend FormattedSol divides by 1e9 on display).",
             "type": "number"
           },
           "avg_sell_count_per_token": {
@@ -7145,6 +7255,12 @@
           "dust_tx_ratio": {
             "type": "number"
           },
+          "failed_txs_30d": {
+            "type": "integer"
+          },
+          "failed_txs_7d": {
+            "type": "integer"
+          },
           "id": {
             "type": "string"
           },
@@ -7157,6 +7273,12 @@
           },
           "label_type": {
             "type": "string"
+          },
+          "landed_txs_30d": {
+            "type": "integer"
+          },
+          "landed_txs_7d": {
+            "type": "integer"
           },
           "last_active_timestamp": {
             "description": "Activity",
@@ -7186,6 +7308,13 @@
           "name": {
             "description": "Identifiers / social",
             "type": "string"
+          },
+          "net_profit_30d": {
+            "type": "number"
+          },
+          "net_profit_7d": {
+            "description": "Realized profit per-mint averages / medians. UNIT: lamports\n(frontend FormattedSol divides by 1e9 on display).\nNet-of-costs windowed figures (CA migration 000095). NetProfit is\nrealized PnL minus tips, per-transaction fees and the fees burned on\nfailed / no-CPI transactions — what the wallet actually kept. The\ngross figure stays on RealizedProfit*d so both are readable.\nSuccessRate / SpamRate are nil when the window observed no\ntransactions at all (0 would read as \"never lands\").",
+            "type": "number"
           },
           "oldest_trade_at": {
             "type": "integer"
@@ -7278,6 +7407,18 @@
           "sold_gt_bought_sells_7d": {
             "type": "integer"
           },
+          "spam_rate_30d": {
+            "type": "number"
+          },
+          "spam_rate_7d": {
+            "type": "number"
+          },
+          "success_rate_30d": {
+            "type": "number"
+          },
+          "success_rate_7d": {
+            "type": "number"
+          },
           "tags": {
             "description": "Relations (loaded on demand)",
             "items": {
@@ -7290,6 +7431,12 @@
           },
           "token_num_7d": {
             "type": "integer"
+          },
+          "total_costs_30d": {
+            "type": "number"
+          },
+          "total_costs_7d": {
+            "type": "number"
           },
           "total_profit": {
             "description": "Profit stats (all-time). UNIT: lamports (see SolBalance note).",
@@ -8079,7 +8226,20 @@
           "day": {
             "type": "string"
           },
+          "failed_cost": {
+            "type": "integer"
+          },
+          "fees": {
+            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nwith `net = profit - fees - tips - failed_cost`. The charts plot NET\nas the headline series; `profit` stays as the flat/gross component.",
+            "type": "integer"
+          },
+          "net": {
+            "type": "integer"
+          },
           "profit": {
+            "type": "integer"
+          },
+          "tips": {
             "type": "integer"
           }
         },
@@ -8182,6 +8342,12 @@
           "dust_tx_ratio": {
             "type": "number"
           },
+          "failed_txs_30d": {
+            "type": "integer"
+          },
+          "failed_txs_7d": {
+            "type": "integer"
+          },
           "has_avatar": {
             "type": "boolean"
           },
@@ -8201,6 +8367,12 @@
           },
           "label_type": {
             "type": "string"
+          },
+          "landed_txs_30d": {
+            "type": "integer"
+          },
+          "landed_txs_7d": {
+            "type": "integer"
           },
           "last_active_timestamp": {
             "type": "integer"
@@ -8228,6 +8400,13 @@
           },
           "name": {
             "type": "string"
+          },
+          "net_profit_30d": {
+            "type": "number"
+          },
+          "net_profit_7d": {
+            "description": "Net-of-costs figures — see trader.Trader for the definitions.",
+            "type": "number"
           },
           "oldest_trade_at": {
             "type": "integer"
@@ -8325,6 +8504,18 @@
           "sold_gt_bought_sells_7d": {
             "type": "integer"
           },
+          "spam_rate_30d": {
+            "type": "number"
+          },
+          "spam_rate_7d": {
+            "type": "number"
+          },
+          "success_rate_30d": {
+            "type": "number"
+          },
+          "success_rate_7d": {
+            "type": "number"
+          },
           "tags": {
             "items": {
               "type": "string"
@@ -8343,6 +8534,12 @@
           },
           "tokens_graduated": {
             "type": "integer"
+          },
+          "total_costs_30d": {
+            "type": "number"
+          },
+          "total_costs_7d": {
+            "type": "number"
           },
           "total_profit": {
             "type": "number"
