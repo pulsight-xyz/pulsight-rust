@@ -356,6 +356,135 @@
         "operationId": "getBacktestsByIdTrades"
       }
     },
+    "/api/cashback/leaderboard": {
+      "get": {
+        "description": "Wallets ranked by pump cashback over a window. Accepts the same composable `f=` filter clauses as /api/traders (repeated `f=key|op|value`), plus cashback-specific sorts. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger (they undercount once rows age out, never invent).",
+        "parameters": [
+          {
+            "description": "1d|7d|30d|all (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "cashback|cashback_claimed|cashback_share|cashback_claim_count|cashback_volume (default cashback)",
+            "in": "query",
+            "name": "sort_by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "asc|desc (default desc)",
+            "in": "query",
+            "name": "direction",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (default 50, max 200)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter clause key|op|value, repeatable",
+            "in": "query",
+            "name": "f",
+            "style": "form",
+            "explode": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackBoardPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pump cashback leaderboard",
+        "tags": [
+          "Cashback"
+        ],
+        "operationId": "getCashbackLeaderboard"
+      }
+    },
+    "/api/cashback/summary": {
+      "get": {
+        "description": "Pool totals, the median wallet and the top earner for a window. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger.",
+        "parameters": [
+          {
+            "description": "1d|7d|30d|all (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackBoardSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pump cashback board summary",
+        "tags": [
+          "Cashback"
+        ],
+        "operationId": "getCashbackSummary"
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Evaluates the connectivity of backing services and returns a system status overview.",
@@ -388,6 +517,29 @@
           "System"
         ],
         "operationId": "getHealth"
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "description": "Process-level liveness: 200 whenever the HTTP server responds. No dependency checks.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness",
+        "tags": [
+          "System"
+        ],
+        "operationId": "getHealthLive"
       }
     },
     "/api/me/credits": {
@@ -502,7 +654,7 @@
     },
     "/api/mints": {
       "get": {
-        "description": "Returns the active-mint catalog with windowed stats. The activity gate is `hourly_mint_trader_activity`; rows ordered by window-bound activity desc. By default the list hides low-liquidity (dust / drained-pool) mints — see `min_pool_sol`.",
+        "description": "Returns the active-mint catalog with windowed stats. The activity gate is `hourly_mint_trader_activity`; rows ordered by distinct traders desc (the wash-resistant default — pass `sort=trades` for raw swap-count order). By default the list hides low-liquidity (dust / drained-pool) mints — see `min_pool_sol`.",
         "parameters": [
           {
             "description": "Window (1m|5m|1h|24h)",
@@ -522,7 +674,7 @@
             }
           },
           {
-            "description": "trades|traders|recent|volume|buys|sells|net_buy|price_change|liquidity_usdc|age (age = newest first_seen first)",
+            "description": "trades|traders|recent|volume|buys|sells|net_buy|price_change|liquidity_usdc|age|organic (age = newest first_seen first, organic = organic-trader count)",
             "in": "query",
             "name": "sort",
             "schema": {
@@ -562,6 +714,14 @@
             "description": "Min market cap in USD (price × circulating supply). Mints with no computable market cap are excluded. Omitted ⇒ no floor.",
             "in": "query",
             "name": "min_market_cap_usd",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min LIFETIME total network fees paid trading the mint (tx fees + MEV tips), in lamports — the same basis as each row's total_fees_sol. Omitted ⇒ no floor.",
+            "in": "query",
+            "name": "min_fees_sol",
             "schema": {
               "type": "number"
             }
@@ -619,6 +779,26 @@
           },
           "500": {
             "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ANALYTICS_UNAVAILABLE — the analytics store refused the read (concurrency/memory ceiling); retry after backoff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "ANALYTICS_TIMEOUT — the read exceeded HEAVY_READ_BUDGET; retry with a narrower window or a smaller page",
             "content": {
               "application/json": {
                 "schema": {
@@ -1564,6 +1744,344 @@
           "OHLCV"
         ],
         "operationId": "getOhlcv"
+      }
+    },
+    "/api/program-logos/{programID}": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Program ID (base58 pubkey)",
+            "in": "path",
+            "name": "programID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Program logo image",
+        "tags": [
+          "Programs"
+        ],
+        "operationId": "getProgramLogosByProgramID"
+      }
+    },
+    "/api/programs/leaderboard": {
+      "get": {
+        "description": "On-chain programs ranked over a window: volume (SOL-projected; venue-executed for AMM-category programs, tx-level otherwise), unique users, revenue (category-gated: net arb extraction for arbitrage programs, decoded venue fees for AMMs, 0 = not measured for routers/unknowns), landed tx count, success / spam / non-swap rates, and a resolved category (admin identity > curated AMM seed > 7d arb-share auto-rule > unknown). Numeric filters are flat query params; SOL values in whole SOL, rates in percent.",
+        "parameters": [
+          {
+            "description": "arbitrage|amm|router|unknown|all (default arbitrage; router = router/aggregator programs; unknown = none of the other three)",
+            "in": "query",
+            "name": "board",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1d|7d|30d|3m (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "volume|users|txs|revenue|success_rate|spam_rate|non_swap_rate|first_seen|last_seen (default volume)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "asc|desc (default desc)",
+            "in": "query",
+            "name": "order",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (default 50, max 200)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Substring match on program id or name",
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Volume floor, whole SOL",
+            "in": "query",
+            "name": "min_volume_sol",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Volume ceiling, whole SOL",
+            "in": "query",
+            "name": "max_volume_sol",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Unique-user floor",
+            "in": "query",
+            "name": "min_users",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Unique-user ceiling",
+            "in": "query",
+            "name": "max_users",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Landed-tx floor",
+            "in": "query",
+            "name": "min_txs",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Landed-tx ceiling",
+            "in": "query",
+            "name": "max_txs",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Revenue floor, whole SOL (may be negative)",
+            "in": "query",
+            "name": "min_revenue_sol",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Revenue ceiling, whole SOL (may be negative)",
+            "in": "query",
+            "name": "max_revenue_sol",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Success-rate floor, percent 0-100",
+            "in": "query",
+            "name": "min_success_rate",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Success-rate ceiling, percent 0-100",
+            "in": "query",
+            "name": "max_success_rate",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Spam-rate floor, percent 0-100",
+            "in": "query",
+            "name": "min_spam_rate",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Spam-rate ceiling, percent 0-100",
+            "in": "query",
+            "name": "max_spam_rate",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Non-swap-rate floor, percent 0-100",
+            "in": "query",
+            "name": "min_non_swap_rate",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Non-swap-rate ceiling, percent 0-100",
+            "in": "query",
+            "name": "max_non_swap_rate",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramBoardPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Programs leaderboard",
+        "tags": [
+          "Programs"
+        ],
+        "operationId": "getProgramsLeaderboard"
+      }
+    },
+    "/api/programs/summary": {
+      "get": {
+        "description": "Board-level aggregates (volume routed, revert share, revenue extracted, programs indexed, new today, median, top-10 concentration) plus the log-binned volume distribution and per-metric filter histograms, computed over the same derived rows the leaderboard serves.",
+        "parameters": [
+          {
+            "description": "arbitrage|amm|router|unknown|all (default arbitrage)",
+            "in": "query",
+            "name": "board",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1d|7d|30d|3m (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramBoardSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Programs board summary",
+        "tags": [
+          "Programs"
+        ],
+        "operationId": "getProgramsSummary"
+      }
+    },
+    "/api/programs/{program_id}/daily": {
+      "get": {
+        "description": "One program's per-day activity over the trailing 3 months: landed txs by kind (swap/arb/other), unique users, SOL-projected volume for both attribution roles, the raw arb + fee revenue components (the client folds them by the program's resolved category), and the failed side (failed swaps/arbs/other, landed no-CPI probes, fees burned). Days with no activity are absent. Also carries the derived per-window figures (\"7d\"/\"30d\"/\"3m\" — volume both roles, users, category-gated revenue, landed/failed txs, success/spam/non-swap rates), computed with the same formulas as the leaderboard rows.",
+        "parameters": [
+          {
+            "description": "Program id (base58)",
+            "in": "path",
+            "name": "program_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramDailySeries"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Program daily stats",
+        "tags": [
+          "Programs"
+        ],
+        "operationId": "getProgramsByProgramIdDaily"
       }
     },
     "/api/sol-price": {
@@ -2964,6 +3482,26 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "ANALYTICS_UNAVAILABLE — the analytics store refused the read (concurrency/memory ceiling); retry after backoff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "ANALYTICS_TIMEOUT — the read exceeded HEAVY_READ_BUDGET; retry with a narrower period or a smaller page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3042,6 +3580,26 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "ANALYTICS_UNAVAILABLE — the analytics store refused the read (concurrency/memory ceiling); retry after backoff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "ANALYTICS_TIMEOUT — the read exceeded HEAVY_READ_BUDGET",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3103,6 +3661,26 @@
           },
           "500": {
             "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ANALYTICS_UNAVAILABLE — the analytics store refused the read (concurrency/memory ceiling); retry after backoff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "ANALYTICS_TIMEOUT — the read exceeded HEAVY_READ_BUDGET",
             "content": {
               "application/json": {
                 "schema": {
@@ -3644,6 +4222,115 @@
           "Traders"
         ],
         "operationId": "getTradersByTraderIDPnls"
+      }
+    },
+    "/api/traders/{walletAddress}/cashback": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Wallet address",
+            "in": "path",
+            "name": "walletAddress",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1d|7d|30d|all (default 7d)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderCashbackStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pump cashback rewards of a wallet",
+        "tags": [
+          "Traders"
+        ],
+        "operationId": "getTradersByWalletAddressCashback"
+      }
+    },
+    "/api/traders/{walletAddress}/cashback/claims": {
+      "get": {
+        "description": "One wallet's claim_cashback executions, newest first, paged. Read from the raw claim ledger (75-day retention): older claims have aged out; the program-reported anchors on the cashback panel carry the true all-time totals. Amounts are in the claim's quote-mint base units (lamports for WSOL rows, which is nearly all of them).",
+        "parameters": [
+          {
+            "description": "Wallet address",
+            "in": "path",
+            "name": "walletAddress",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (default 50, max 200)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackClaimsPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cashback claim history of a wallet",
+        "tags": [
+          "Cashback"
+        ],
+        "operationId": "getTradersByWalletAddressCashbackClaims"
       }
     },
     "/api/traders/{walletAddress}/created-tokens": {
@@ -5175,6 +5862,9 @@
           "priority_fee_lamports": {
             "type": "integer"
           },
+          "quote_lamports": {
+            "type": "integer"
+          },
           "quote_mint": {
             "type": "string"
           },
@@ -5463,6 +6153,166 @@
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BundlerEntry"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackBoardPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackBoardRow"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackBoardRow": {
+        "properties": {
+          "cashback_volume_lamports": {
+            "description": "CashbackVolumeLamports over TotalVolumeLamports is VolumeShare — nil\nwhen the window moved no volume (no share, which is not a 0% share).",
+            "type": "integer"
+          },
+          "censored": {
+            "type": "boolean"
+          },
+          "claim_count": {
+            "type": "integer"
+          },
+          "claimed_lamports": {
+            "description": "ClaimedLamports / ClaimCount are nil only before CA 000106 exists. On\nthe lifetime window they are RETENTION-BOUNDED (the raw claim ledger\ncarries a 75-day TTL) — they undercount once rows age out rather than\ninventing, the trader panel's lifetime_claimed precedent.",
+            "type": "integer"
+          },
+          "earned_lamports": {
+            "description": "EarnedLamports — cashback accrued in the window TO THIS WALLET'S OWN\naccumulator (since classifier 0cb3f9c, executor-routed fills whose\naccumulator belongs to the filler are excluded); the board's primary\nmeasure (claiming is sporadic, earning is the smooth signal).",
+            "type": "integer"
+          },
+          "first_seen_ms": {
+            "type": "integer"
+          },
+          "last_active_ms": {
+            "type": "integer"
+          },
+          "pump_image": {
+            "type": "string"
+          },
+          "pump_username": {
+            "description": "Pump.fun profile enrichment (server-side, cached): the wallet's pump\nusername and avatar when it has a profile. Always nil on a censored\nrow — enrichment runs only on rows whose identity ships.",
+            "type": "string"
+          },
+          "rank": {
+            "description": "Rank is 1-based within the requested window + filters (offset-aware).",
+            "type": "integer"
+          },
+          "total_volume_lamports": {
+            "type": "integer"
+          },
+          "trader": {
+            "description": "Trader is empty on a censored landing row (Censored true): the figures\nstay real, the identity is withheld server-side.",
+            "type": "string"
+          },
+          "volume_share": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackBoardSummary": {
+        "properties": {
+          "claim_count": {
+            "type": "integer"
+          },
+          "claimed_lamports": {
+            "description": "ClaimedLamports / ClaimCount: on the lifetime window these are\nRETENTION-BOUNDED sums over the 75-day claim ledger (undercount, never\ninvented).",
+            "type": "integer"
+          },
+          "earned_lamports": {
+            "type": "integer"
+          },
+          "earners": {
+            "description": "Earners / EarnedLamports — wallets with any earned cashback in the\nwindow, and their summed earnings (the \"% of pool\" denominator).",
+            "type": "integer"
+          },
+          "median_earned_lamports": {
+            "description": "Population marks.",
+            "type": "integer"
+          },
+          "rank1_earned_lamports": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackClaimRow": {
+        "properties": {
+          "amount_lamports": {
+            "type": "integer"
+          },
+          "program": {
+            "type": "string"
+          },
+          "quote_mint": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackClaimsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackClaimRow"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "pubkey": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.CashbackProgramTotals": {
+        "properties": {
+          "program": {
+            "description": "\"pumpfun\" | \"pumpswap\"",
+            "type": "string"
+          },
+          "total_claimed_lamports": {
+            "type": "integer"
+          },
+          "total_earned_lamports": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -5768,6 +6618,13 @@
             "description": "DuplicateCount backs \"copycat\": how many mints share this (symbol, name).",
             "type": "integer"
           },
+          "fee_sell_buy_ratio": {
+            "type": "number"
+          },
+          "fee_trap_buckets": {
+            "description": "FeeTrapBuckets/FeeSellBuyRatio back \"fee_trap\" (confiscatory sell\ntax, CA 000133/r59): distinct 15-minute buckets in the last 7 days\nwhose sells executed below half that bucket's buy VWAP, and the\nwindow's overall sell/buy exec-price ratio (display only).",
+            "type": "integer"
+          },
           "freeze_count": {
             "description": "FreezeCount/ThawCount back the \"freezes_holders\" reason.",
             "type": "integer"
@@ -5785,6 +6642,10 @@
             "type": "integer"
           },
           "thaw_count": {
+            "type": "integer"
+          },
+          "transfer_fee_bps": {
+            "description": "TransferFeeBps backs \"transfer_fee\" (Token-2022, CA 000134/r61): the\non-chain transfer fee in basis points (max of the current and\nscheduled fee).",
             "type": "integer"
           }
         },
@@ -5909,7 +6770,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintHoneypot"
               }
             ],
-            "description": "Honeypot flags a likely sell-blocking token. Best-effort decoration;\nabsent when no reason fires. Step 1 populates the \"freezes_holders\"\nreason from mint_safety_events (froze many holder accounts, thawed\nfew). Future Token-2022 reasons (transfer_fee/hook/…) accrete here."
+            "description": "Honeypot flags a likely sell-blocking token. Best-effort decoration;\nabsent when no reason fires. Step 1 populates the \"freezes_holders\"\nreason from mint_safety_events (froze many holder accounts, thawed\nfew). Future Token-2022 reasons (transfer_fee/hook/…) accrete here.\nThe \"impersonating\" reason (verified ticker reused by a different\nmint) also rides here — badge-only, no filter arm."
           },
           "insiders": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintInsiders"
@@ -5923,6 +6784,10 @@
           },
           "logo_uri": {
             "type": "string"
+          },
+          "lp_burned": {
+            "description": "LpBurned reports whether ANY LP burn is on file for the mint — the same\n`lp_events(op='burn')` set the `lp_burned=1` listing filter uses, so the\naudit glyph and the filter can never disagree. Page-scoped, so it is a\ndefinite true/false for every returned row (never nil on the list path);\nnil on the detail path, where the batch does not run.",
+            "type": "boolean"
           },
           "market_cap_usd": {
             "description": "MarketCapUsd is PriceUsd × circulating supply. Equivalently\nclose_sol × supply_raw × sol_usd / 1e6 (token decimals cancel), so\nit's populated even when decimals are unknown (unlike PriceUsd). nil\nwhen the WSOL close, supply, or SOL/USD ref is missing.",
@@ -5985,12 +6850,36 @@
           "symbol": {
             "type": "string"
           },
+          "top10_pct": {
+            "description": "Top10Pct is the top-10 holder concentration as a PERCENT of circulating\nsupply (0..100). Already read per page by top10ConcentrationBatch to\nscore the row — emitting it costs nothing extra and is what the listing's\nDistribution column leads with. nil when the accumulator has no row for\nthe mint (fresh token, or holder balances not yet folded).",
+            "type": "number"
+          },
+          "top_dex": {
+            "description": "TopDex is the venue slug of the mint's DOMINANT pool over the activity\nwindow — the pool with the most quote volume, i.e. the venue the token\nactually trades on. Same vocabulary as `?dex=` and `swaps.dex`; look up\nthe display label via DEX_LABEL. Rides fillMarketsCount's existing scan\n(same GROUP BY, one more aggregate), so it is free. nil when the mint had\nno dex_swaps row in the window.",
+            "type": "string"
+          },
+          "total_fees_sol": {
+            "description": "TotalFeesSol — LIFETIME network fees paid trading the mint, in\nlamports: tx fees (base + priority) plus MEV tips summed over its\nswaps (CA 000137 on mint_activity_totals; the 000064 sawtooth basis —\nlifetime between stats rebuilds, re-synced to the swaps 3-month\nretention at each healer finalize). Unlike the counts above it is NOT\nhours-window-bound. nil until the migration is applied or when the\npage decoration read fails.",
+            "type": "integer"
+          },
           "trader_count": {
             "type": "integer"
+          },
+          "trader_quality": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderQuality"
+              }
+            ],
+            "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nsybil badge and sort=organic. Best-effort list decoration; nil before\nthe migration or when the batch read fails."
           },
           "unique_traders": {
             "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable.",
             "type": "integer"
+          },
+          "verified": {
+            "description": "Verified marks a mint on the curated verified token list (Jupiter's,\nrefreshed hourly by the jupverified registry). Also the copycat\nCANONICAL exemption: a verified member of a name-dupe farm keeps its\nlisting spot and loses the copycat badge while the clones stay\nflagged. Omitted when false or when no registry is wired.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -6008,6 +6897,26 @@
           },
           "5m": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintTraderQuality": {
+        "properties": {
+          "classified": {
+            "type": "integer"
+          },
+          "fresh": {
+            "type": "integer"
+          },
+          "organic": {
+            "type": "integer"
+          },
+          "ruggy": {
+            "type": "integer"
+          },
+          "traders": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6112,6 +7021,10 @@
           "swap_count": {
             "type": "integer"
           },
+          "total_fees_sol": {
+            "description": "Total network fees paid trading the mint in the window, in lamports:\ntx fees (base + priority) plus MEV tips, summed over its swaps.\nPopulated by the per-mint stats endpoint only; the listing endpoint\n(/api/mints) leaves it nil (the OHLCV planes carry no fee data).",
+            "type": "integer"
+          },
           "volume_sol": {
             "description": "Total SOL traded (buy + sell), in lamports.",
             "type": "integer"
@@ -6129,6 +7042,310 @@
           },
           "stats": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintStatsByWindow"
+          },
+          "total_fees_lifetime_sol": {
+            "description": "TotalFeesLifetimeSol — LIFETIME network fees paid trading the mint,\nin lamports (same basis and plane as MintRow.TotalFeesSol on the\nlisting: CA 000137's `fees` on mint_activity_totals, NOT bound to any\nwindow). Feeds the token detail page's header bar. nil until the\nmigration is applied or when the best-effort read fails.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramBoardCounts": {
+        "properties": {
+          "all": {
+            "type": "integer"
+          },
+          "amm": {
+            "type": "integer"
+          },
+          "arbitrage": {
+            "type": "integer"
+          },
+          "router": {
+            "type": "integer"
+          },
+          "unknown": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramBoardPage": {
+        "properties": {
+          "board": {
+            "type": "string"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramBoardRow"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramBoardRow": {
+        "properties": {
+          "arb_txs": {
+            "type": "integer"
+          },
+          "category": {
+            "description": "Category is the RESOLVED category: admin identity > embedded\nprogram seed > 7d auto-arb rule > \"unknown\".",
+            "type": "string"
+          },
+          "censored": {
+            "type": "boolean"
+          },
+          "failed_txs": {
+            "type": "integer"
+          },
+          "first_seen_ms": {
+            "type": "integer"
+          },
+          "hidden": {
+            "description": "Hidden mirrors the admin identity's hide flag. Hidden rows never\nreach the public board (dropped before ranking) — only the admin\nlisting serves them.",
+            "type": "boolean"
+          },
+          "last_seen_ms": {
+            "type": "integer"
+          },
+          "logo_uri": {
+            "description": "LogoURI is the admin-assigned identity logo, falling back to the\nembedded seed's self-hosted mirror path (/program-logos/…); empty\nwhen the program has none.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name is the admin-assigned identity name, falling back to the\nembedded seed name; empty when unnamed.",
+            "type": "string"
+          },
+          "non_swap_rate": {
+            "type": "number"
+          },
+          "program_id": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer"
+          },
+          "revenue_lamports": {
+            "description": "RevenueLamports is category-gated (ProgramRevenueLamports): net arb\nextraction for arbitrage programs (can be negative — an unprofitable\nbot), decoded venue fees for amm/dex programs, and 0 (\"not measured\")\nfor routers, unknowns and every other category.",
+            "type": "integer"
+          },
+          "spam_rate": {
+            "type": "number"
+          },
+          "spark": {
+            "description": "Spark is the program's daily volume over the trailing 7 days\n(lamports, oldest first; role-matched like VolumeLamports). Only\npopulated on the rows a page actually returns.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "success_rate": {
+            "type": "number"
+          },
+          "txs": {
+            "description": "Txs is the landed tx count (incl. no-CPI probes).",
+            "type": "integer"
+          },
+          "unique_users": {
+            "type": "integer"
+          },
+          "volume_lamports": {
+            "description": "VolumeLamports is venue-executed volume for amm/dex-category\nprograms (true venue volume incl. routed flow) and tx-level primary\nvolume for everything else. WSOL-projected lamports; unpriced\nquote flow is excluded, never guessed.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramBoardSummary": {
+        "properties": {
+          "board": {
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramBoardCounts"
+          },
+          "earners": {
+            "type": "integer"
+          },
+          "failed_total": {
+            "type": "integer"
+          },
+          "filters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramMetricHist"
+            },
+            "type": "object"
+          },
+          "negative_rev": {
+            "type": "integer"
+          },
+          "new_today": {
+            "type": "integer"
+          },
+          "programs_total": {
+            "type": "integer"
+          },
+          "rank2_volume_lamports": {
+            "description": "Rank2 volume anchors the table's magnitude-bar axis — the bar scale\nbreaks at #2 when #1 is an outlier. Zero below 2 programs.",
+            "type": "integer"
+          },
+          "revenue_total_lamports": {
+            "type": "integer"
+          },
+          "txs_total": {
+            "type": "integer"
+          },
+          "volume_total_lamports": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramDailySeries": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramDayStat"
+            },
+            "type": "array"
+          },
+          "program_id": {
+            "type": "string"
+          },
+          "window_days": {
+            "type": "integer"
+          },
+          "windows": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.ProgramWindowFigures"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramDayStat": {
+        "properties": {
+          "arb_no_cpi_txs": {
+            "type": "integer"
+          },
+          "arb_revenue_lamports": {
+            "type": "integer"
+          },
+          "arb_txs": {
+            "type": "integer"
+          },
+          "day": {
+            "description": "\"2026-08-23\" (UTC)",
+            "type": "string"
+          },
+          "failed_arb_txs": {
+            "type": "integer"
+          },
+          "failed_fee_lamports": {
+            "type": "integer"
+          },
+          "failed_other_txs": {
+            "type": "integer"
+          },
+          "failed_swap_txs": {
+            "type": "integer"
+          },
+          "fee_revenue_lamports": {
+            "type": "integer"
+          },
+          "other_txs": {
+            "type": "integer"
+          },
+          "primary_volume_lamports": {
+            "type": "integer"
+          },
+          "swap_txs": {
+            "type": "integer"
+          },
+          "txs": {
+            "type": "integer"
+          },
+          "users": {
+            "type": "integer"
+          },
+          "venue_volume_lamports": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramMetricHist": {
+        "properties": {
+          "bins": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "hi": {
+            "type": "number"
+          },
+          "lo": {
+            "type": "number"
+          },
+          "log": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.ProgramWindowFigures": {
+        "properties": {
+          "failed_txs": {
+            "type": "integer"
+          },
+          "non_swap_rate": {
+            "type": "number"
+          },
+          "primary_volume_lamports": {
+            "type": "integer"
+          },
+          "revenue_lamports": {
+            "type": "integer"
+          },
+          "spam_rate": {
+            "type": "number"
+          },
+          "success_rate": {
+            "type": "number"
+          },
+          "txs": {
+            "description": "Txs is the landed tx count (incl. no-CPI probes).",
+            "type": "integer"
+          },
+          "unique_users": {
+            "type": "integer"
+          },
+          "venue_volume_lamports": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6423,6 +7640,70 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.TraderCashbackStats": {
+        "properties": {
+          "avg_cashback_bps": {
+            "type": "number"
+          },
+          "cashback_volume_lamports": {
+            "description": "CashbackVolumeLamports — the window's quote-side volume on\ncashback-enabled coins; TotalVolumeLamports the window's whole\nquote-side volume (buy in + sell out). VolumeShare divides the two\n(nil when no volume); AvgCashbackBps = earned / cashback volume in\nbasis points (nil when no cashback volume) — the effective rebate\nrate, which is per-coin on-chain (30 and 90 bps both live).",
+            "type": "integer"
+          },
+          "claim_count": {
+            "description": "Claim cadence, lifetime, all quote denominations.",
+            "type": "integer"
+          },
+          "claimable_lamports": {
+            "description": "ClaimableLamports is the unclaimed balance sitting in the wallet's\naccumulators: cashback accrued SINCE its last claim. A claim sweeps\nthe accumulator in full, so the balance at that moment is 0 and\neverything after it is unclaimed — which makes this immune both to\nthe claim ledger's TTL and to history that predates our ingest, since\nonly a timestamp comes from the claim side. Wallets that never claimed\nreport everything we have observed them earn. Reads LOW, never high\n(see cashbackAccruedSince for the two bounded undercounts).",
+            "type": "integer"
+          },
+          "claimed_lamports": {
+            "description": "ClaimedLamports — WSOL cashback swept by claim_cashback in the window.\nThis is the cash-basis component net PnL ADDS (page, series, board —\nall three fold the same claimed numbers, #c22).",
+            "type": "integer"
+          },
+          "earned_lamports": {
+            "description": "EarnedLamports — cashback ACCRUED by the window's swaps (the exact\nper-swap amounts from the pump trade events, WSOL-quoted markets\nonly). Informational: the net-PnL formulas fold CLAIMED, not this.",
+            "type": "integer"
+          },
+          "last_claim_at": {
+            "type": "string"
+          },
+          "lifetime_claimed_lamports": {
+            "type": "integer"
+          },
+          "lifetime_earned_lamports": {
+            "description": "LifetimeEarnedLamports is exact: it comes from `trader_stats.cashback`,\nwhich is untimed, WSOL-only by construction and rebuildable from\n`swaps`. LifetimeClaimedLamports is bounded by the raw claim ledger's\n75-day retention (CA 000098) — the same compromise reliability's \"all\"\nwindow makes, undercounting rather than inventing. ProgramTotals below\ncarries the program's own all-time figures beside it.",
+            "type": "integer"
+          },
+          "program_totals": {
+            "description": "ProgramTotals — the lifetime running totals the pump program itself\nstamped on the wallet's LATEST claim event, one row per program\n(pumpfun = bonding curve, pumpswap = AMM), read from\n`cashback_claim_anchors` so they outlive the raw ledger's TTL. They\ncover history from before our ingest and are surfaced verbatim as\n\"program-reported\" — DISPLAY ONLY. Never fold them into a lamport\nfigure: the on-chain counter is one u64 per accumulator and cashback\nis not SOL-only (~7% of sampled claims carried a USDC quote), so\nwhether it mixes denominations is not observable from the event.\nEmpty array when the wallet never claimed.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackProgramTotals"
+            },
+            "type": "array"
+          },
+          "pubkey": {
+            "type": "string"
+          },
+          "recent_claims": {
+            "description": "RecentClaims — the wallet's latest claims, newest first (≤10).\nAmountLamports is in the claim's quote-mint base units — lamports for\nWSOL rows, which is nearly all of them.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackClaimRow"
+            },
+            "type": "array"
+          },
+          "total_volume_lamports": {
+            "type": "integer"
+          },
+          "volume_share": {
+            "type": "number"
+          },
+          "window": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.TraderPeriodStatsRow": {
         "properties": {
           "arb_tx_ratio": {
@@ -6434,6 +7715,10 @@
           },
           "buy_sell_ratio": {
             "type": "number"
+          },
+          "cashback_claimed_lamports": {
+            "description": "CashbackClaimedLamports — WSOL pump cashback the wallet CLAIMED in the\nwindow (cash basis; CA 000097). The one POSITIVE cost-block component.",
+            "type": "integer"
           },
           "didnt_buy_sells": {
             "description": "DidntBuySells / SoldGtBoughtSells count the window's uncovered\nsells: countIf(sold_without_buy) and countIf(sold_more_than_bought)\nover `swaps`. Replaces the retired phantom proceeds split (CA\nmigration 000018_remove_phantom_tracking).",
@@ -6450,7 +7735,7 @@
             "type": "integer"
           },
           "net_realized_profit": {
-            "description": "NetRealizedProfit = RealizedProfit − TotalFees − TotalTips −\nFailedCostLamports: what the wallet actually kept. This is the\nHEADLINE PnL; RealizedProfit stays as the flat/gross component.",
+            "description": "NetRealizedProfit = RealizedProfit − TotalFees − TotalTips −\nFailedCostLamports + CashbackClaimedLamports: what the wallet actually\nkept. This is the HEADLINE PnL; RealizedProfit stays as the flat/gross\ncomponent. Mirrors rollupWindowAgg.netPnl and boardWindowExpr (#c22).",
             "type": "integer"
           },
           "realized_profit": {
@@ -6555,6 +7840,10 @@
           "no_cpi_txs": {
             "type": "integer"
           },
+          "observed_landed_txs": {
+            "description": "ObservedLandedTxs is LandedTxs narrowed to the hours the failed-tx\nstream was actually running. Failed transactions are only recorded for\nthose hours — a historical backfill drops them at the fetch layer, and\nnothing observed them before the feature shipped — so this is the only\nlanded count the rates below may divide by. It equals LandedTxs once a\nwindow is fully observed; the gap is how much of the window is\nun-scored.",
+            "type": "integer"
+          },
           "pubkey": {
             "type": "string"
           },
@@ -6562,7 +7851,7 @@
             "type": "number"
           },
           "success_rate": {
-            "description": "SuccessRate = LandedTxs / (LandedTxs + FailedTxs); SpamRate =\n(FailedTxs + NoCpiTxs) / (LandedTxs + FailedTxs + NoCpiTxs).\nPOINTERS: nil when the denominator is 0 — a wallet with no activity\nhas no rate, and that must not read as 0%.",
+            "description": "SuccessRate = ObservedLandedTxs / (ObservedLandedTxs + FailedTxs);\nSpamRate = (FailedTxs + NoCpiTxs) / (ObservedLandedTxs + FailedTxs +\nNoCpiTxs). POINTERS: nil when the denominator is 0 — a wallet with no\nOBSERVED activity has no rate, and that must not read as 0% (or, worse,\nas a 100% success score for a window nobody watched).",
             "type": "number"
           },
           "window": {
@@ -6573,6 +7862,7 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
@@ -6580,6 +7870,7 @@
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
@@ -7230,6 +8521,31 @@
             "type": "number"
           },
           "buy_size_cv": {
+            "type": "number"
+          },
+          "cashback_30d": {
+            "type": "number"
+          },
+          "cashback_7d": {
+            "description": "Pump cashback, lamports. `Cashback*` is what ACCRUED in the window\n(the screening signal); `CashbackClaimed*` is what was swept, and is\nthe component already folded into NetProfit* — do not add it again.",
+            "type": "number"
+          },
+          "cashback_claim_count_30d": {
+            "type": "integer"
+          },
+          "cashback_claim_count_7d": {
+            "type": "integer"
+          },
+          "cashback_claimed_30d": {
+            "type": "number"
+          },
+          "cashback_claimed_7d": {
+            "type": "number"
+          },
+          "cashback_share_30d": {
+            "type": "number"
+          },
+          "cashback_share_7d": {
             "type": "number"
           },
           "chain": {
@@ -8229,6 +9545,9 @@
           "failed_cost": {
             "type": "integer"
           },
+          "failed_txs": {
+            "type": "integer"
+          },
           "fees": {
             "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nwith `net = profit - fees - tips - failed_cost`. The charts plot NET\nas the headline series; `profit` stays as the flat/gross component.",
             "type": "integer"
@@ -8239,7 +9558,14 @@
           "profit": {
             "type": "integer"
           },
+          "success_rate": {
+            "type": "number"
+          },
           "tips": {
+            "type": "integer"
+          },
+          "txs": {
+            "description": "Txs is the day's landed transaction count; FailedTxs the failed-tx\nledger's failed swaps+arbs+other. SuccessRate divides the OBSERVED\nlanded count (failed-tx-watched hours only, CA 000096) by\nobserved+failed — nil when no hour of the day was observed, so\npre-ledger history reads \"not measured\" rather than a fake 100%.",
             "type": "integer"
           }
         },
@@ -8288,16 +9614,22 @@
           "avg_sell_count_per_token": {
             "type": "number"
           },
-          "behavioral_30d": {
-            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
-          },
-          "behavioral_7d": {
+          "behavioral_1d": {
             "allOf": [
               {
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
               }
             ],
-            "description": "Behavioral7d / Behavioral30d are the two rows the\n\"Behavioural\" panel toggles between (7d and 30d are the only\nsupported windows). nil → panel renders its empty state for that\nwindow."
+            "description": "Behavioral1d/7d/30d/All are the rows the \"Behavioural\" panel\ntoggles between. nil → panel renders its empty state for that\nwindow."
+          },
+          "behavioral_30d": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
+          },
+          "behavioral_7d": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
+          },
+          "behavioral_all": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
           },
           "buy_30d": {
             "type": "integer"
@@ -8312,6 +9644,31 @@
             "type": "number"
           },
           "buy_size_cv": {
+            "type": "number"
+          },
+          "cashback_30d": {
+            "type": "number"
+          },
+          "cashback_7d": {
+            "description": "Pump cashback: accrued in the window (the screening signal) and\nswept. Claimed is ALREADY inside NetProfit7d — never add it on top.",
+            "type": "number"
+          },
+          "cashback_claim_count_30d": {
+            "type": "integer"
+          },
+          "cashback_claim_count_7d": {
+            "type": "integer"
+          },
+          "cashback_claimed_30d": {
+            "type": "number"
+          },
+          "cashback_claimed_7d": {
+            "type": "number"
+          },
+          "cashback_share_30d": {
+            "type": "number"
+          },
+          "cashback_share_7d": {
             "type": "number"
           },
           "chain": {
@@ -8434,6 +9791,13 @@
             "description": "PnlDistribution is the 5-bucket realised-PnL distribution for\nthe request window: [<-50%, -50–0%, 0–2×, 2–5×, >5×]. Nil when\nthe snapshot wasn't inlined.",
             "items": {
               "type": "integer"
+            },
+            "type": "array"
+          },
+          "pnl_distributions": {
+            "description": "PnlDistributions is one 5-bucket realised-PnL distribution row per\ncanonical window (1d, 7d, 30d, all), windowed for real — unlike the\nlist path's snapshot-folded PnlDistribution above, which is the\nleaderboard's all-time buckets. Drives the trader-detail \"PnL\ndistribution\" chips and their window toggle.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.TraderPnlDistributionRow"
             },
             "type": "array"
           },
@@ -8626,6 +9990,32 @@
           }
         },
         "type": "object"
+      },
+      "pulsight_internal_core_usecases_trader.TraderPnlDistributionRow": {
+        "properties": {
+          "pnl_0x_2x": {
+            "type": "integer"
+          },
+          "pnl_2x_5x": {
+            "type": "integer"
+          },
+          "pnl_gt_5x": {
+            "type": "integer"
+          },
+          "pnl_lt_nd5": {
+            "type": "integer"
+          },
+          "pnl_nd5_0x": {
+            "type": "integer"
+          },
+          "trader": {
+            "type": "string"
+          },
+          "window_label": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     }
   },
@@ -8633,6 +10023,10 @@
     {
       "name": "Backtests",
       "x-displayName": "Backtests"
+    },
+    {
+      "name": "Cashback",
+      "x-displayName": "Cashback"
     },
     {
       "name": "Credits",
@@ -8649,6 +10043,10 @@
     {
       "name": "OHLCV",
       "x-displayName": "OHLCV"
+    },
+    {
+      "name": "Programs",
+      "x-displayName": "Programs"
     },
     {
       "name": "Strategies",
