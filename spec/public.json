@@ -878,6 +878,92 @@
         "operationId": "getMintsByPubkey"
       }
     },
+    "/api/mints/{pubkey}/activity": {
+      "get": {
+        "description": "Returns the mint's per-minute swap count + network fees (tx fee + MEV tip, lamports) over [from, to), plus the lifetime totals strictly before `from`. Range capped at 25 hours.",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Range start, unix seconds (inclusive)",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Range end, unix seconds (exclusive)",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintActivitySeed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Mint Activity Seed",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyActivity"
+      }
+    },
     "/api/mints/{pubkey}/lp-events": {
       "get": {
         "description": "Recent liquidity-pool add/remove/burn events for a mint (newest first), from `lp_events`. Sparse where upstream doesn't yet extract LP for a DEX; returns an empty array then.",
@@ -6594,6 +6680,54 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.MintActivityBase": {
+        "properties": {
+          "fees_lamports": {
+            "type": "integer"
+          },
+          "swaps": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintActivityPoint": {
+        "properties": {
+          "fees_lamports": {
+            "type": "integer"
+          },
+          "swaps": {
+            "type": "integer"
+          },
+          "ts": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintActivitySeed": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintActivityBase"
+          },
+          "from": {
+            "type": "integer"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintActivityPoint"
+            },
+            "type": "array"
+          },
+          "to": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.MintBundled": {
         "properties": {
           "initial_pct": {
@@ -6811,7 +6945,7 @@
             "type": "string"
           },
           "price_sparkline": {
-            "description": "PriceSparkline is the mint's last-24h price shape: WSOL-quoted per-minute\ncloses, oldest→newest, at most priceSparklineMaxPoints values. A mint\nthat traded through the whole window is sampled evenly down to that cap\n(so the series still spans 24h, just coarser); one that traded for an\nhour carries all of it. It rides the SAME scan as PriceUsd, so it\ncarries the same denomination caveat: WSOL-quoted only, which is why a\nUSDC-only mint has none rather than a series in another unit (mixing\nquotes would draw a step that never happened). Values are raw SOL per\nwhole token, rounded to 6 significant digits — the client normalises to\nits own min/max, so the unit only has to be CONSISTENT within the\nseries, and this is a SHAPE, not a price read (use PriceUsd for that).\nOnly minutes that actually traded appear, so the x axis is trade\nsequence, not wall clock. Omitted below 2 points: one point is not a\nline (a mint minutes old legitimately has none yet).",
+            "description": "PriceSparkline is the mint's last-24h price shape: WSOL-quoted per-minute\ncloses of the mint's DOMINANT pool (highest 24h quote volume — one pool,\nnever a merge, so a dust side-market's prints can't flatten the line),\noldest→newest, at most priceSparklineMaxPoints values. A mint that\ntraded through the whole window is sampled evenly down to that cap\n(so the series still spans 24h, just coarser); one that traded for an\nhour carries all of it. It rides the SAME scan as PriceUsd, so it\ncarries the same denomination caveat: WSOL-quoted only, which is why a\nUSDC-only mint has none rather than a series in another unit (mixing\nquotes would draw a step that never happened). Values are raw SOL per\nwhole token, rounded to 6 significant digits — the client normalises to\nits own min/max, so the unit only has to be CONSISTENT within the\nseries, and this is a SHAPE, not a price read (use PriceUsd for that).\nOnly minutes that actually traded appear, so the x axis is trade\nsequence, not wall clock. Omitted below 2 points — but a mint younger\nthan ~10 minutes gets its points from 1-SECOND candles instead, so a\nfresh row draws a line as soon as it has two seconds of trading.",
             "items": {
               "type": "number"
             },
@@ -6822,7 +6956,7 @@
             "type": "number"
           },
           "risk_score": {
-            "description": "RiskScore/RiskVerdict are a fast at-a-glance risk score (0..100 +\nlow|caution|high|critical) computed from the signals already on this row\n(authorities, honeypot/copycat/sell-trap, dev %, bundle) via the same\ndomain ScoreRisk as the per-mint risk card. The listing omits the inputs\nthat need per-mint queries (top-10 concentration, snipers, insider %,\nliquidity), so this is a LOWER BOUND of the card's full score — the token\npage is authoritative. nil only if scoring was skipped.",
+            "description": "RiskScore/RiskVerdict are a fast at-a-glance risk score (0..100 +\nlow|caution|high|critical) computed from the signals already on this row\n(authorities, honeypot/copycat/sell-trap, dev %, bundle, top-10\nconcentration, lifetime fees per tx, trader quality) via the same\ndomain ScoreRisk as the per-mint risk card. The listing omits the inputs\nthat need per-mint queries (snipers, insider %, liquidity), so this is a\nLOWER BOUND of the card's full score — the token page is authoritative.\nnil only if scoring was skipped.",
             "type": "integer"
           },
           "risk_verdict": {
@@ -6862,6 +6996,10 @@
             "description": "TotalFeesSol — LIFETIME network fees paid trading the mint, in\nlamports: tx fees (base + priority) plus MEV tips summed over its\nswaps (CA 000137 on mint_activity_totals; the 000064 sawtooth basis —\nlifetime between stats rebuilds, re-synced to the swaps 3-month\nretention at each healer finalize). Unlike the counts above it is NOT\nhours-window-bound. nil until the migration is applied or when the\npage decoration read fails.",
             "type": "integer"
           },
+          "total_tx_count": {
+            "description": "TotalTxCount — LIFETIME swap count for the mint, from the same\nmint_activity_totals seek as TotalFeesSol (and on its same sawtooth\nbasis). It is the fee figure's denominator: the bot-fee-pattern risk\nrule scores fees PER transaction, so the two must share a basis —\nthe hours-window SwapCount would not. nil whenever TotalFeesSol is.",
+            "type": "integer"
+          },
           "trader_count": {
             "type": "integer"
           },
@@ -6871,7 +7009,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderQuality"
               }
             ],
-            "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nsybil badge and sort=organic. Best-effort list decoration; nil before\nthe migration or when the batch read fails."
+            "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nORGANIC distribution slot, the low_organic_activity risk rule and\nsort=organic. Best-effort list decoration; nil before the migration or\nwhen the batch read fails."
           },
           "unique_traders": {
             "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable.",
@@ -7459,6 +7597,14 @@
           "top10": {
             "description": "% of circulating",
             "type": "number"
+          },
+          "trader_quality": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderQuality"
+              }
+            ],
+            "description": "TraderQuality echoes the wallet-class fold the low-organic rule\nscored (same shape as the listing's trader_quality decoration) so the\nrisk card can render an organic-share tile even when no rule fired.\nnil when the plane is absent."
           },
           "verdict": {
             "description": "low|caution|high|critical",
