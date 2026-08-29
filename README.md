@@ -70,7 +70,7 @@ became `rustls` in reqwest 0.13).
 ## If progenitor chokes
 
 If a future spec change hits a schema progenitor still can't model (per
-`docs/sdks-design.md` §2, an accepted risk), fall back to `openapi-generator`
+an accepted risk), fall back to `openapi-generator`
 (rust-reqwest) into a `generated/` dir and point `lib.rs` at it instead of the
 macro:
 

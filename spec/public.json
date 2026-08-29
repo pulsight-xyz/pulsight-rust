@@ -727,6 +727,22 @@
             }
           },
           {
+            "description": "Only mints first seen within the last N seconds (launched < N ago). Mints with no observed first_seen are excluded.",
+            "in": "query",
+            "name": "max_age_secs",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only mints first seen at least N seconds ago (launched > N ago). Mints with no observed first_seen are excluded.",
+            "in": "query",
+            "name": "min_age_secs",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
             "description": "Max rows (default 50, max 500)",
             "in": "query",
             "name": "limit",
@@ -3109,6 +3125,350 @@
         "operationId": "getTipsServices"
       }
     },
+    "/api/token-filters/": {
+      "get": {
+        "description": "Returns all saved Tokens-board filter presets belonging to the authenticated user.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_tokenview.Filter"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Token Filters",
+        "tags": [
+          "Token-Filters"
+        ],
+        "operationId": "getTokenFilters"
+      },
+      "post": {
+        "description": "Creates a new Tokens-board filter preset for the authenticated user.",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/pulsight_internal_core_ports_input.FilterCreateRequest"
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_tokenview.Filter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Create Token Filter",
+        "tags": [
+          "Token-Filters"
+        ],
+        "operationId": "postTokenFilters"
+      }
+    },
+    "/api/token-filters/{id}": {
+      "delete": {
+        "description": "Permanently removes a Tokens-board filter preset belonging to the authenticated user.",
+        "parameters": [
+          {
+            "description": "Filter preset ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Delete Token Filter",
+        "tags": [
+          "Token-Filters"
+        ],
+        "operationId": "deleteTokenFiltersById"
+      },
+      "get": {
+        "description": "Returns a specific Tokens-board filter preset by ID.",
+        "parameters": [
+          {
+            "description": "Filter preset ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_tokenview.Filter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Get Token Filter",
+        "tags": [
+          "Token-Filters"
+        ],
+        "operationId": "getTokenFiltersById"
+      },
+      "put": {
+        "description": "Replaces an existing Tokens-board filter preset for the authenticated user.",
+        "parameters": [
+          {
+            "description": "Filter preset ID (UUID)",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/pulsight_internal_core_ports_input.FilterUpdateRequest"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_tokenview.Filter"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Update Token Filter",
+        "tags": [
+          "Token-Filters"
+        ],
+        "operationId": "putTokenFiltersById"
+      }
+    },
     "/api/trader-filters/": {
       "get": {
         "description": "Returns all saved filter presets belonging to the authenticated user.",
@@ -3161,15 +3521,7 @@
       "post": {
         "description": "Creates a new filter preset for the authenticated user.",
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/pulsight_internal_core_ports_input.FilterCreateRequest"
-              }
-            }
-          },
-          "description": "Filter preset details",
-          "required": true
+          "$ref": "#/components/requestBodies/pulsight_internal_core_ports_input.FilterCreateRequest"
         },
         "responses": {
           "201": {
@@ -3395,15 +3747,7 @@
           }
         ],
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/pulsight_internal_core_ports_input.FilterUpdateRequest"
-              }
-            }
-          },
-          "description": "Updated filter preset",
-          "required": true
+          "$ref": "#/components/requestBodies/pulsight_internal_core_ports_input.FilterUpdateRequest"
         },
         "responses": {
           "200": {
@@ -5350,6 +5694,30 @@
     }
   ],
   "components": {
+    "requestBodies": {
+      "pulsight_internal_core_ports_input.FilterCreateRequest": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/pulsight_internal_core_ports_input.FilterCreateRequest"
+            }
+          }
+        },
+        "description": "Filter preset details",
+        "required": true
+      },
+      "pulsight_internal_core_ports_input.FilterUpdateRequest": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/pulsight_internal_core_ports_input.FilterUpdateRequest"
+            }
+          }
+        },
+        "description": "Updated filter preset",
+        "required": true
+      }
+    },
     "securitySchemes": {
       "api-token": {
         "in": "header",
@@ -6787,6 +7155,9 @@
       },
       "pulsight_internal_core_domain_aggregator.MintInsiders": {
         "properties": {
+          "pct_of_supply": {
+            "type": "number"
+          },
           "wallets": {
             "type": "integer"
           }
@@ -8008,19 +8379,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
-          "3m",
           "1d",
           "7d",
           "30d",
-          "all"
+          "all",
+          "3m"
         ],
         "type": "string",
         "x-enum-varnames": [
-          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll"
+          "WindowAll",
+          "Window3m"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -8256,6 +8627,33 @@
           "TierThree",
           "TierEnterprise"
         ]
+      },
+      "pulsight_internal_core_domain_tokenview.Filter": {
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "filters": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       },
       "pulsight_internal_core_domain_trader.CopyBandPoint": {
         "properties": {
@@ -10213,6 +10611,10 @@
     {
       "name": "Tips",
       "x-displayName": "Tips"
+    },
+    {
+      "name": "Token-Filters",
+      "x-displayName": "Token Filters"
     },
     {
       "name": "Trader-Filters",
