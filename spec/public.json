@@ -594,7 +594,7 @@
     },
     "/api/me/credits/ledger": {
       "get": {
-        "description": "Returns the caller's recent credit ledger entries (grants, consumes, refunds), newest first.",
+        "description": "Returns one page of the caller's credit ledger entries (grants, consumes, refunds), newest first, alongside the total the request matches. `from` and `to` are RFC3339 and bound a half-open [from, to) window; either may be omitted to leave that side unbounded, and `total` counts the window rather than the whole ledger.",
         "parameters": [
           {
             "description": "Max entries to return (default 50, max 200)",
@@ -602,6 +602,30 @@
             "name": "limit",
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "description": "Entries to skip (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Window start, inclusive (RFC3339)",
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Window end, exclusive (RFC3339)",
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -611,10 +635,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_credit.Transaction"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.PaginatedCreditLedger"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
                 }
               }
             }
@@ -3860,6 +3891,14 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "description": "Comma list of DISPLAY-only window families to hydrate: 1d, all. Costs one extra query per page; sorting and f= filters are unaffected (they read 7d/30d board columns).",
+            "in": "query",
+            "name": "extra_windows",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4134,7 +4173,7 @@
     },
     "/api/traders/copyability": {
       "post": {
-        "description": "For each wallet's fills, the price a copier filling N blocks later would have got — an entry/exit slippage curve and the share of the wallet's edge that survives. Latency is counted in SLOTS, since the stored swap timestamp resolves only to whole seconds. Measures PRICE TRANSFER, not PnL. Supply size_lamports to also get the EXECUTION half: the slippage band each fill needed (split signal-buy vs follow-on) and what each widening step buys, priced at the target's own exit.",
+        "description": "For each wallet's fills, the price a copier filling N blocks later would have got — an entry/exit slippage curve and the share of the wallet's edge that survives. The window is a half-open [from_ts, to_ts) in Unix epoch SECONDS. Latency is counted in SLOTS, since the stored swap timestamp resolves only to whole seconds. Measures PRICE TRANSFER, not PnL. Supply size_lamports to also get the EXECUTION half: the slippage band each fill needed (split signal-buy vs follow-on) and what each widening step buys, priced at the target's own exit.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4143,7 +4182,7 @@
               }
             }
           },
-          "description": "Wallets, window and slot ladder",
+          "description": "Wallets, epoch-second window and slot ladder",
           "required": true
         },
         "responses": {
@@ -4178,115 +4217,6 @@
           "Traders"
         ],
         "operationId": "postTradersCopyability"
-      }
-    },
-    "/api/traders/export": {
-      "post": {
-        "description": "Exports trader records based on advanced filters.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.TraderExportRequest"
-              }
-            }
-          },
-          "description": "Export Filter Details",
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Trader"
-                  },
-                  "type": "array"
-                }
-              },
-              "text/csv": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Trader"
-                  },
-                  "type": "array"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              },
-              "text/csv": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              },
-              "text/csv": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "402": {
-            "description": "CREDIT_EXHAUSTED — api credit pool empty (only when credit enforcement is enabled)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              },
-              "text/csv": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              },
-              "text/csv": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-token": []
-          }
-        ],
-        "summary": "Export Traders",
-        "tags": [
-          "Traders"
-        ],
-        "operationId": "postTradersExport"
       }
     },
     "/api/traders/search": {
@@ -5750,6 +5680,26 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.PaginatedCreditLedger": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_credit.Transaction"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.PaginatedPnls": {
         "properties": {
           "items": {
@@ -5810,30 +5760,6 @@
           },
           "total_runs": {
             "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "internal_adapters_primary_http_handler.TraderExportRequest": {
-        "properties": {
-          "columns": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "direction": {
-            "type": "string"
-          },
-          "filters": {
-            "additionalProperties": {},
-            "type": "object"
-          },
-          "format": {
-            "type": "string"
-          },
-          "sort_by": {
-            "type": "string"
           }
         },
         "type": "object"
@@ -5947,15 +5873,16 @@
             },
             "type": "array"
           },
-          "from": {
-            "type": "string"
+          "from_ts": {
+            "description": "Half-open measurement window [from_ts, to_ts) in Unix epoch SECONDS.\nSeconds rather than an RFC3339 string because every timestamp this\nmeasurement touches already is one: Solana's blockTime is an i64 of whole\nseconds, and the per-leg ledger stores it unchanged.",
+            "type": "integer"
           },
           "size_lamports": {
             "description": "OPTIONAL copier trade size in lamports. Supplying it attaches the\nexecution half — what slippage band each fill needed, and what each\nwidening step buys. Optional because a band is a threshold for a\nconcrete size against a concrete depth, while the price-transfer curve\nabove is deliberately unit-free; both come from one read either way.",
             "type": "integer"
           },
-          "to": {
-            "type": "string"
+          "to_ts": {
+            "type": "integer"
           },
           "wallets": {
             "items": {
@@ -5980,8 +5907,8 @@
             },
             "type": "array"
           },
-          "from": {
-            "type": "string"
+          "from_ts": {
+            "type": "integer"
           },
           "reports": {
             "items": {
@@ -5993,8 +5920,8 @@
             "description": "Echoed only when a size was supplied, alongside the band ladder the\nexecution half was evaluated on.",
             "type": "integer"
           },
-          "to": {
-            "type": "string"
+          "to_ts": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6016,6 +5943,7 @@
             "type": "integer"
           },
           "med_slot_delta": {
+            "description": "MedSlotDelta is the median signed slot gap (neighbour minus subject), so\na negative value means the neighbour traded first. Real copy-trading\nclusters at 1-2 slots, roughly 0.3-0.6s at current block times, while\ncoincidence scatters over tens of slots. Zero means the SAME block, the\ntightest gap this endpoint can report: the source data carries no\ntransaction index, so which of the two went first inside that block is\nunknown, not absent.",
             "type": "integer"
           },
           "mutual_rate": {
@@ -6159,12 +6087,20 @@
           "avg_reactivity_secs": {
             "type": "number"
           },
+          "avg_rp_1d": {
+            "description": "lamports",
+            "type": "number"
+          },
           "avg_rp_30d": {
             "description": "lamports",
             "type": "number"
           },
           "avg_rp_7d": {
             "description": "lamports",
+            "type": "number"
+          },
+          "avg_rp_all": {
+            "description": "lamports, per-mint over the wallet's life",
             "type": "number"
           },
           "avg_sells_per_token": {
@@ -6182,12 +6118,20 @@
           "med_reactivity_secs": {
             "type": "number"
           },
+          "med_rp_1d": {
+            "description": "lamports",
+            "type": "number"
+          },
           "med_rp_30d": {
             "description": "lamports",
             "type": "number"
           },
           "med_rp_7d": {
             "description": "lamports",
+            "type": "number"
+          },
+          "med_rp_all": {
+            "description": "lamports, per-mint over the wallet's life",
             "type": "number"
           },
           "med_sells_per_token": {
@@ -6670,6 +6614,13 @@
           "rank": {
             "description": "Rank is 1-based within the requested window + filters (offset-aware).",
             "type": "integer"
+          },
+          "tags": {
+            "description": "Tags are the derived classification tags (`deriveTags`), resolved for\nthe whole page in one round trip so a row states what the wallet is\nwithout being expanded. Empty on a censored row, and nil when the\nenrichment query failed — best-effort by contract, never an error the\nboard surfaces.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "total_volume_lamports": {
             "type": "integer"
@@ -7395,6 +7346,9 @@
       },
       "pulsight_internal_core_domain_aggregator.MintStatsByWindow": {
         "properties": {
+          "12h": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
+          },
           "1h": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
           },
@@ -7404,7 +7358,13 @@
           "24h": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
           },
+          "30m": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
+          },
           "5m": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
+          },
+          "6h": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintWindowStats"
           }
         },
@@ -7554,6 +7514,10 @@
           },
           "total_fees_lifetime_sol": {
             "description": "TotalFeesLifetimeSol — LIFETIME network fees paid trading the mint,\nin lamports (same basis and plane as MintRow.TotalFeesSol on the\nlisting: CA 000137's `fees` on mint_activity_totals, NOT bound to any\nwindow). Feeds the token detail page's header bar. nil until the\nmigration is applied or when the best-effort read fails.",
+            "type": "integer"
+          },
+          "total_tx_count_lifetime": {
+            "description": "TotalTxCountLifetime — LIFETIME swap count for the mint, from the same\nmint_activity_totals seek as TotalFeesLifetimeSol and on its same basis.\nIt is the denominator a windowless token-metric gate reads, and pairing\nthe two keeps a per-transaction fee figure on one basis. nil whenever\nTotalFeesLifetimeSol is.",
             "type": "integer"
           }
         },
@@ -8053,7 +8017,13 @@
           "1m",
           "5m",
           "15m",
-          "30m"
+          "30m",
+          "1h",
+          "2h",
+          "4h",
+          "6h",
+          "12h",
+          "24h"
         ],
         "type": "string",
         "x-enum-varnames": [
@@ -8064,7 +8034,13 @@
           "Timeframe1m",
           "Timeframe5m",
           "Timeframe15m",
-          "Timeframe30m"
+          "Timeframe30m",
+          "Timeframe1h",
+          "Timeframe2h",
+          "Timeframe4h",
+          "Timeframe6h",
+          "Timeframe12h",
+          "Timeframe24h"
         ]
       },
       "pulsight_internal_core_domain_aggregator.TipHeatmapPoint": {
@@ -8116,6 +8092,10 @@
           "avg_reactivity_secs": {
             "type": "number"
           },
+          "avg_realized_profit_lamports": {
+            "description": "Avg/MedianRealizedProfitLamports are the window's realized profit per\nTOKEN — one figure per mint the wallet actually sold, then averaged and\nmedianed across them. Mints with no sell in the window are excluded\nrather than counted as zero: an unclosed position has no realized\noutcome, and zeros would drag the median toward it. The pair is the\nper-window twin of the leaderboard's Avg RP / Med RP columns.",
+            "type": "number"
+          },
           "avg_sell_count_per_token": {
             "type": "number"
           },
@@ -8130,6 +8110,9 @@
             "type": "number"
           },
           "median_reactivity_secs": {
+            "type": "number"
+          },
+          "median_realized_profit_lamports": {
             "type": "number"
           },
           "median_sell_count_per_token": {
@@ -8379,19 +8362,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -9021,10 +9004,16 @@
           "active_hours_count": {
             "type": "integer"
           },
+          "arb_tx_ratio_1d": {
+            "type": "number"
+          },
           "arb_tx_ratio_30d": {
             "type": "number"
           },
           "arb_tx_ratio_7d": {
+            "type": "number"
+          },
+          "arb_tx_ratio_all": {
             "type": "number"
           },
           "avatar": {
@@ -9042,20 +9031,35 @@
             "description": "Holding time (seconds)",
             "type": "number"
           },
+          "avg_realized_profit_1d": {
+            "type": "number"
+          },
           "avg_realized_profit_30d": {
             "type": "number"
           },
           "avg_realized_profit_7d": {
             "type": "number"
           },
+          "avg_realized_profit_all": {
+            "type": "number"
+          },
           "avg_sell_count_per_token": {
             "type": "number"
+          },
+          "buy_1d": {
+            "type": "integer"
           },
           "buy_30d": {
             "type": "integer"
           },
           "buy_7d": {
             "type": "integer"
+          },
+          "buy_all": {
+            "type": "integer"
+          },
+          "buy_sell_ratio_1d": {
+            "type": "number"
           },
           "buy_sell_ratio_30d": {
             "type": "number"
@@ -9064,7 +9068,13 @@
             "description": "Computed ratios",
             "type": "number"
           },
+          "buy_sell_ratio_all": {
+            "type": "number"
+          },
           "buy_size_cv": {
+            "type": "number"
+          },
+          "cashback_1d": {
             "type": "number"
           },
           "cashback_30d": {
@@ -9074,11 +9084,23 @@
             "description": "Pump cashback, lamports. `Cashback*` is what ACCRUED in the window\n(the screening signal); `CashbackClaimed*` is what was swept, and is\nthe component already folded into NetProfit* — do not add it again.",
             "type": "number"
           },
+          "cashback_all": {
+            "type": "number"
+          },
+          "cashback_claim_count_1d": {
+            "type": "integer"
+          },
           "cashback_claim_count_30d": {
             "type": "integer"
           },
           "cashback_claim_count_7d": {
             "type": "integer"
+          },
+          "cashback_claim_count_all": {
+            "type": "integer"
+          },
+          "cashback_claimed_1d": {
+            "type": "number"
           },
           "cashback_claimed_30d": {
             "type": "number"
@@ -9086,10 +9108,19 @@
           "cashback_claimed_7d": {
             "type": "number"
           },
+          "cashback_claimed_all": {
+            "type": "number"
+          },
+          "cashback_share_1d": {
+            "type": "number"
+          },
           "cashback_share_30d": {
             "type": "number"
           },
           "cashback_share_7d": {
+            "type": "number"
+          },
+          "cashback_share_all": {
             "type": "number"
           },
           "chain": {
@@ -9105,6 +9136,9 @@
             },
             "type": "array"
           },
+          "didnt_buy_sells_1d": {
+            "type": "integer"
+          },
           "didnt_buy_sells_30d": {
             "type": "integer"
           },
@@ -9112,13 +9146,22 @@
             "description": "Uncovered-sell counters for the window (CA migration 000018):\nsells with no observed buy of the mint / sells exceeding the\nobserved bought balance.",
             "type": "integer"
           },
+          "didnt_buy_sells_all": {
+            "type": "integer"
+          },
           "dust_tx_ratio": {
             "type": "number"
+          },
+          "failed_txs_1d": {
+            "type": "integer"
           },
           "failed_txs_30d": {
             "type": "integer"
           },
           "failed_txs_7d": {
+            "type": "integer"
+          },
+          "failed_txs_all": {
             "type": "integer"
           },
           "id": {
@@ -9134,10 +9177,16 @@
           "label_type": {
             "type": "string"
           },
+          "landed_txs_1d": {
+            "type": "integer"
+          },
           "landed_txs_30d": {
             "type": "integer"
           },
           "landed_txs_7d": {
+            "type": "integer"
+          },
+          "landed_txs_all": {
             "type": "integer"
           },
           "last_active_timestamp": {
@@ -9153,10 +9202,16 @@
           "median_holding_time": {
             "type": "number"
           },
+          "median_realized_profit_1d": {
+            "type": "number"
+          },
           "median_realized_profit_30d": {
             "type": "number"
           },
           "median_realized_profit_7d": {
+            "type": "number"
+          },
+          "median_realized_profit_all": {
             "type": "number"
           },
           "median_sell_count_per_token": {
@@ -9169,11 +9224,17 @@
             "description": "Identifiers / social",
             "type": "string"
           },
+          "net_profit_1d": {
+            "type": "number"
+          },
           "net_profit_30d": {
             "type": "number"
           },
           "net_profit_7d": {
             "description": "Realized profit per-mint averages / medians. UNIT: lamports\n(frontend FormattedSol divides by 1e9 on display).\nNet-of-costs windowed figures (CA migration 000095). NetProfit is\nrealized PnL minus tips, per-transaction fees and the fees burned on\nfailed / no-CPI transactions — what the wallet actually kept. The\ngross figure stays on RealizedProfit*d so both are readable.\nSuccessRate / SpamRate are nil when the window observed no\ntransactions at all (0 would read as \"never lands\").",
+            "type": "number"
+          },
+          "net_profit_all": {
             "type": "number"
           },
           "oldest_trade_at": {
@@ -9227,6 +9288,10 @@
           "realized_profit": {
             "type": "number"
           },
+          "realized_profit_1d": {
+            "description": "1-day window. Same measures and same derivations as the 7d/30d\nblocks, hydrated per page rather than read off the board — so these\nare DISPLAY-only: neither sorting nor an `f=` clause can address them.",
+            "type": "number"
+          },
           "realized_profit_30d": {
             "description": "30-day period",
             "type": "number"
@@ -9251,15 +9316,31 @@
             "description": "Risk assessment",
             "type": "integer"
           },
+          "roi_1d": {
+            "type": "number"
+          },
+          "roi_all": {
+            "description": "Lifetime window, also DISPLAY-only. The gross figure is RealizedProfit\nabove. There is deliberately no lifetime failure record: the failed-tx\nplanes are TTL-bounded to three months while the landed side is not,\nso a lifetime success or spam rate would be structurally flattering.",
+            "type": "number"
+          },
+          "sell_1d": {
+            "type": "integer"
+          },
           "sell_30d": {
             "type": "integer"
           },
           "sell_7d": {
             "type": "integer"
           },
+          "sell_all": {
+            "type": "integer"
+          },
           "sol_balance": {
             "description": "Balances. UNIT: lamports (BIGINT, held as *float64 for wire\ncompatibility). The field name says \"Sol\" for historical reasons;\nthe wire convention is lamports because the frontend's\nFormattedSol component divides by 1e9 itself.",
             "type": "number"
+          },
+          "sold_gt_bought_sells_1d": {
+            "type": "integer"
           },
           "sold_gt_bought_sells_30d": {
             "type": "integer"
@@ -9267,10 +9348,19 @@
           "sold_gt_bought_sells_7d": {
             "type": "integer"
           },
+          "sold_gt_bought_sells_all": {
+            "type": "integer"
+          },
+          "spam_rate_1d": {
+            "type": "number"
+          },
           "spam_rate_30d": {
             "type": "number"
           },
           "spam_rate_7d": {
+            "type": "number"
+          },
+          "success_rate_1d": {
             "type": "number"
           },
           "success_rate_30d": {
@@ -9286,16 +9376,28 @@
             },
             "type": "array"
           },
+          "token_num_1d": {
+            "type": "integer"
+          },
           "token_num_30d": {
             "type": "integer"
           },
           "token_num_7d": {
             "type": "integer"
           },
+          "token_num_all": {
+            "type": "integer"
+          },
+          "total_costs_1d": {
+            "type": "number"
+          },
           "total_costs_30d": {
             "type": "number"
           },
           "total_costs_7d": {
+            "type": "number"
+          },
+          "total_costs_all": {
             "type": "number"
           },
           "total_profit": {
@@ -9351,10 +9453,16 @@
           "wallet_address": {
             "type": "string"
           },
+          "winrate_1d": {
+            "type": "number"
+          },
           "winrate_30d": {
             "type": "number"
           },
           "winrate_7d": {
+            "type": "number"
+          },
+          "winrate_all": {
             "type": "number"
           }
         },
@@ -10083,6 +10191,9 @@
       },
       "pulsight_internal_core_usecases_trader.PnlSeriesPoint": {
         "properties": {
+          "cashback": {
+            "type": "integer"
+          },
           "day": {
             "type": "string"
           },
@@ -10093,7 +10204,7 @@
             "type": "integer"
           },
           "fees": {
-            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nwith `net = profit - fees - tips - failed_cost`. The charts plot NET\nas the headline series; `profit` stays as the flat/gross component.",
+            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nplus the day's CLAIMED pump cashback (cash basis, the one positive\ncomponent), with `net = profit - fees - tips - failed_cost +\ncashback`. The charts plot NET as the headline series; `profit` stays\nas the flat/gross component.",
             "type": "integer"
           },
           "net": {
@@ -10134,10 +10245,16 @@
           "active_hours_count": {
             "type": "integer"
           },
+          "arb_tx_ratio_1d": {
+            "type": "number"
+          },
           "arb_tx_ratio_30d": {
             "type": "number"
           },
           "arb_tx_ratio_7d": {
+            "type": "number"
+          },
+          "arb_tx_ratio_all": {
             "type": "number"
           },
           "avg_buy_count_per_token": {
@@ -10149,10 +10266,16 @@
           "avg_holding_time": {
             "type": "number"
           },
+          "avg_realized_profit_1d": {
+            "type": "number"
+          },
           "avg_realized_profit_30d": {
             "type": "number"
           },
           "avg_realized_profit_7d": {
+            "type": "number"
+          },
+          "avg_realized_profit_all": {
             "type": "number"
           },
           "avg_sell_count_per_token": {
@@ -10175,11 +10298,20 @@
           "behavioral_all": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderBehavioralStats"
           },
+          "buy_1d": {
+            "type": "integer"
+          },
           "buy_30d": {
             "type": "integer"
           },
           "buy_7d": {
             "type": "integer"
+          },
+          "buy_all": {
+            "type": "integer"
+          },
+          "buy_sell_ratio_1d": {
+            "type": "number"
           },
           "buy_sell_ratio_30d": {
             "type": "number"
@@ -10187,7 +10319,13 @@
           "buy_sell_ratio_7d": {
             "type": "number"
           },
+          "buy_sell_ratio_all": {
+            "type": "number"
+          },
           "buy_size_cv": {
+            "type": "number"
+          },
+          "cashback_1d": {
             "type": "number"
           },
           "cashback_30d": {
@@ -10197,11 +10335,23 @@
             "description": "Pump cashback: accrued in the window (the screening signal) and\nswept. Claimed is ALREADY inside NetProfit7d — never add it on top.",
             "type": "number"
           },
+          "cashback_all": {
+            "type": "number"
+          },
+          "cashback_claim_count_1d": {
+            "type": "integer"
+          },
           "cashback_claim_count_30d": {
             "type": "integer"
           },
           "cashback_claim_count_7d": {
             "type": "integer"
+          },
+          "cashback_claim_count_all": {
+            "type": "integer"
+          },
+          "cashback_claimed_1d": {
+            "type": "number"
           },
           "cashback_claimed_30d": {
             "type": "number"
@@ -10209,10 +10359,19 @@
           "cashback_claimed_7d": {
             "type": "number"
           },
+          "cashback_claimed_all": {
+            "type": "number"
+          },
+          "cashback_share_1d": {
+            "type": "number"
+          },
           "cashback_share_30d": {
             "type": "number"
           },
           "cashback_share_7d": {
+            "type": "number"
+          },
+          "cashback_share_all": {
             "type": "number"
           },
           "chain": {
@@ -10233,6 +10392,9 @@
             },
             "type": "array"
           },
+          "didnt_buy_sells_1d": {
+            "type": "integer"
+          },
           "didnt_buy_sells_30d": {
             "type": "integer"
           },
@@ -10240,13 +10402,23 @@
             "description": "Uncovered-sell counters (CA migration 000018): sells with no\nobserved buy of the mint / sells exceeding the observed bought\nbalance, scoped to the window.",
             "type": "integer"
           },
+          "didnt_buy_sells_all": {
+            "type": "integer"
+          },
           "dust_tx_ratio": {
             "type": "number"
+          },
+          "failed_txs_1d": {
+            "type": "integer"
           },
           "failed_txs_30d": {
             "type": "integer"
           },
           "failed_txs_7d": {
+            "type": "integer"
+          },
+          "failed_txs_all": {
+            "description": "There is deliberately no lifetime success/spam rate here: their\ndenominator is the one read that cannot prune by partition, so it is\nnot paid per listing page. The trader-detail reliability panel serves\nthem per wallet.",
             "type": "integer"
           },
           "has_avatar": {
@@ -10269,10 +10441,16 @@
           "label_type": {
             "type": "string"
           },
+          "landed_txs_1d": {
+            "type": "integer"
+          },
           "landed_txs_30d": {
             "type": "integer"
           },
           "landed_txs_7d": {
+            "type": "integer"
+          },
+          "landed_txs_all": {
             "type": "integer"
           },
           "last_active_timestamp": {
@@ -10287,10 +10465,16 @@
           "median_holding_time": {
             "type": "number"
           },
+          "median_realized_profit_1d": {
+            "type": "number"
+          },
           "median_realized_profit_30d": {
             "type": "number"
           },
           "median_realized_profit_7d": {
+            "type": "number"
+          },
+          "median_realized_profit_all": {
             "type": "number"
           },
           "median_sell_count_per_token": {
@@ -10302,11 +10486,17 @@
           "name": {
             "type": "string"
           },
+          "net_profit_1d": {
+            "type": "number"
+          },
           "net_profit_30d": {
             "type": "number"
           },
           "net_profit_7d": {
             "description": "Net-of-costs figures — see trader.Trader for the definitions.",
+            "type": "number"
+          },
+          "net_profit_all": {
             "type": "number"
           },
           "oldest_trade_at": {
@@ -10376,6 +10566,10 @@
           "realized_profit": {
             "type": "number"
           },
+          "realized_profit_1d": {
+            "description": "1-day window. Same measures and derivations as the 7d/30d blocks,\nhydrated per page instead of read off the leaderboard — DISPLAY-only,\nso neither `sort` nor an `f=` clause can address these.",
+            "type": "number"
+          },
           "realized_profit_30d": {
             "type": "number"
           },
@@ -10397,14 +10591,30 @@
           "risk_score": {
             "type": "integer"
           },
+          "roi_1d": {
+            "type": "number"
+          },
+          "roi_all": {
+            "description": "Lifetime window, also DISPLAY-only; the gross figure is\nRealizedProfit. No lifetime failure record is served: the failed-tx\nplanes are TTL-bounded to three months while the landed side is not,\nso a lifetime success or spam rate would be structurally flattering.",
+            "type": "number"
+          },
+          "sell_1d": {
+            "type": "integer"
+          },
           "sell_30d": {
             "type": "integer"
           },
           "sell_7d": {
             "type": "integer"
           },
+          "sell_all": {
+            "type": "integer"
+          },
           "sol_balance": {
             "type": "number"
+          },
+          "sold_gt_bought_sells_1d": {
+            "type": "integer"
           },
           "sold_gt_bought_sells_30d": {
             "type": "integer"
@@ -10412,10 +10622,19 @@
           "sold_gt_bought_sells_7d": {
             "type": "integer"
           },
+          "sold_gt_bought_sells_all": {
+            "type": "integer"
+          },
+          "spam_rate_1d": {
+            "type": "number"
+          },
           "spam_rate_30d": {
             "type": "number"
           },
           "spam_rate_7d": {
+            "type": "number"
+          },
+          "success_rate_1d": {
             "type": "number"
           },
           "success_rate_30d": {
@@ -10430,10 +10649,16 @@
             },
             "type": "array"
           },
+          "token_num_1d": {
+            "type": "integer"
+          },
           "token_num_30d": {
             "type": "integer"
           },
           "token_num_7d": {
+            "type": "integer"
+          },
+          "token_num_all": {
             "type": "integer"
           },
           "tokens_created": {
@@ -10443,10 +10668,16 @@
           "tokens_graduated": {
             "type": "integer"
           },
+          "total_costs_1d": {
+            "type": "number"
+          },
           "total_costs_30d": {
             "type": "number"
           },
           "total_costs_7d": {
+            "type": "number"
+          },
+          "total_costs_all": {
             "type": "number"
           },
           "total_profit": {
@@ -10500,10 +10731,16 @@
           "wallet_address": {
             "type": "string"
           },
+          "winrate_1d": {
+            "type": "number"
+          },
           "winrate_30d": {
             "type": "number"
           },
           "winrate_7d": {
+            "type": "number"
+          },
+          "winrate_all": {
             "type": "number"
           }
         },
