@@ -4173,7 +4173,7 @@
     },
     "/api/traders/copyability": {
       "post": {
-        "description": "For each wallet's fills, the price a copier filling N blocks later would have got — an entry/exit slippage curve and the share of the wallet's edge that survives. The window is a half-open [from_ts, to_ts) in Unix epoch SECONDS. Latency is counted in SLOTS, since the stored swap timestamp resolves only to whole seconds. Measures PRICE TRANSFER, not PnL. Supply size_lamports to also get the EXECUTION half: the slippage band each fill needed (split signal-buy vs follow-on) and what each widening step buys, priced at the target's own exit.",
+        "description": "Replays each wallet's most recent positions in the window as a copier would have traded them: an order of size_lamports on every buy, every sell mirrored in proportion, executed against the pool state a copier landing N blocks later found, with pool fees, the wallet's own transaction fees and tips, and unsold tokens valued at the pool's closing price. Per wallet and per latency: the copier's return on deployed capital (return_bps, pnl_lamports), the wallet's own return on the same positions (target_return_bps), and the waterfall between them (entry_cost_bps, exit_cost_bps, fees_bps), plus positions won and lost. The execution profile gives the slippage setting each buy needed and what widening it buys. The window is a half-open [from_ts, to_ts) in Unix epoch SECONDS; latency is counted in BLOCKS because the stored swap timestamp resolves only to whole seconds. An estimate, not a backtest: it prices against observed pool states and books no rent or borrow.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4212,7 +4212,7 @@
             "api-token": []
           }
         ],
-        "summary": "Copyability of a wallet set at simulated latencies",
+        "summary": "What copying a wallet set would have returned, by landing latency",
         "tags": [
           "Traders"
         ],
@@ -5878,7 +5878,7 @@
             "type": "integer"
           },
           "size_lamports": {
-            "description": "OPTIONAL copier trade size in lamports. Supplying it attaches the\nexecution half — what slippage band each fill needed, and what each\nwidening step buys. Optional because a band is a threshold for a\nconcrete size against a concrete depth, while the price-transfer curve\nabove is deliberately unit-free; both come from one read either way.",
+            "description": "Size of each mirrored buy in lamports; 1e9 (1 SOL) when omitted. Every\nreturn in the report is on the capital this size deploys.",
             "type": "integer"
           },
           "to_ts": {
@@ -5917,7 +5917,7 @@
             "type": "array"
           },
           "size_lamports": {
-            "description": "Echoed only when a size was supplied, alongside the band ladder the\nexecution half was evaluated on.",
+            "description": "The mirrored buy size the reports were replayed at, and the slippage\nladder their execution profile was evaluated on.",
             "type": "integer"
           },
           "to_ts": {
@@ -8367,19 +8367,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -8655,18 +8655,18 @@
             "type": "integer"
           },
           "marginal_fills": {
-            "description": "Fills this rung adds over the previous (tighter) rung, and what they are\nworth priced at the target's own realised exit. This is the number the\nband decision turns on: a rung that adds fills at a negative return is\nbuying losses, however much it improves the fill rate.",
+            "description": "Buys this rung adds over the previous, tighter one, and their mean\nreturn priced at the copier's own exit from the position. A rung that\nadds buys at a negative return is buying losses, whatever it does to\nthe fill rate.",
             "type": "integer"
           },
           "marginal_pnl_pct": {
             "type": "number"
           },
           "mean_entry_vs_target_bps": {
-            "description": "Mean execution price of the filled trades against the target's own fill\nprice. Positive is worse for the copier, matching copyability's sign.",
+            "description": "Mean price the filled buys execute at against the wallet's own price\nfor the same buy. Positive is worse for the copier.",
             "type": "number"
           },
           "mean_pnl_pct": {
-            "description": "Expected return over everything filled at this band, same pricing.\nNULL when no filled trade has a priceable exit.",
+            "description": "Mean return over every buy filled at this setting, same pricing. NULL\nwhen nothing filled.",
             "type": "number"
           }
         },
@@ -8700,37 +8700,55 @@
           "delay_slots": {
             "type": "integer"
           },
-          "edge_retained_pct": {
-            "description": "Share of the target's edge left after paying the round-trip cost.\nNULL when the target's edge is not positive: you cannot \"retain\" a\nshare of an edge that is not there, and reporting 0% would read as\n\"latency destroyed it\" when latency was never the problem.",
+          "deployed_lamports": {
+            "description": "The copier's outcome at the requested size: one order of size_lamports\nmirrored on each of the wallet's buys, every sell mirrored in proportion,\nunsold tokens valued at the pool's last price in the window.",
+            "type": "integer"
+          },
+          "entry_cost_bps": {
+            "description": "What copying costs, in order: buying after the wallet at the copier's\nsize, selling after it, and transaction fees plus tips on every\nmirrored transaction.",
             "type": "number"
           },
           "entry_slippage_bps": {
-            "description": "Positive is ALWAYS worse for the copier, on both sides: a buy filled\nhigher than the target's, a sell filled lower.",
+            "description": "Price drift alone, independent of size: the pool's worst price in the\nlanding block against the price the wallet's own trade left, averaged\nover positions. Positive is always worse for the copier.",
             "type": "number"
           },
           "execution": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionAtDelay"
-              }
-            ],
-            "description": "Present only when the caller supplied a trade size: what band this\nlatency needs and what each widening step buys. See copyexecution.go."
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionAtDelay"
+          },
+          "exit_cost_bps": {
+            "type": "number"
           },
           "exit_slippage_bps": {
+            "type": "number"
+          },
+          "fees_bps": {
             "type": "number"
           },
           "measured_fills": {
             "type": "integer"
           },
-          "round_trip_cost_bps": {
+          "pnl_lamports": {
+            "type": "integer"
+          },
+          "positions": {
+            "description": "Positions the replay could price at this latency, and how they ended\nfor the copier after fees.",
+            "type": "integer"
+          },
+          "positions_lost": {
+            "type": "integer"
+          },
+          "positions_won": {
+            "type": "integer"
+          },
+          "return_bps": {
             "type": "number"
           },
-          "target_edge_bps": {
-            "description": "The target's own gross round-trip return over the same fills, so the\ncomparison below is self-consistent — one price source, one window.",
+          "target_return_bps": {
+            "description": "What the wallet itself made on the same positions, at its own fills.",
             "type": "number"
           },
           "unmeasurable_fills": {
-            "description": "Fills with no trade to copy into at this latency.",
+            "description": "Swap legs with and without a pool state to execute into.",
             "type": "integer"
           }
         },
@@ -8745,7 +8763,7 @@
             "type": "array"
           },
           "in_block_move_bps": {
-            "description": "Where the adverse move comes from. `InBlockSharePct` is the share of the\ntotal move that had already happened by the end of the target's OWN\nblock — i.e. from the copy wave the target's trade set off, not from\nlatency. Only populated when the ladder includes slot 0.",
+            "description": "Where the adverse entry move comes from: the share that had already\nhappened by the end of the wallet's own block, before any latency of\nthe copier's. Populated only when the ladder includes block 0.",
             "type": "number"
           },
           "in_block_share_pct": {
@@ -8760,7 +8778,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandQuantiles"
               }
             ],
-            "description": "Required band, split because the population is bimodal."
+            "description": "Slippage needed, split because the first buy on a token is contested\nand later buys rarely are."
           },
           "required_follow_on": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyBandQuantiles"
@@ -8779,9 +8797,6 @@
       },
       "pulsight_internal_core_domain_trader.CopyExecutionSummary": {
         "properties": {
-          "exits_unpriced": {
-            "type": "integer"
-          },
           "fills": {
             "type": "integer"
           },
@@ -8789,7 +8804,6 @@
             "type": "integer"
           },
           "median_pool_quote_lamports": {
-            "description": "Context that explains the numbers: how deep the pools are when this\nwallet buys, and how hard its own buy hits them.",
             "type": "integer"
           },
           "median_target_impact_bps": {
@@ -8807,23 +8821,42 @@
       "pulsight_internal_core_domain_trader.CopyabilityReport": {
         "properties": {
           "delays": {
-            "description": "Never nil on the wire: an empty curve is [], not null.",
+            "description": "Never nil on the wire: an empty ladder is [], not null.",
             "items": {
               "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyDelayPoint"
             },
             "type": "array"
           },
           "execution_summary": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionSummary"
-              }
-            ],
-            "description": "Present only when the caller supplied a trade size."
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.CopyExecutionSummary"
+          },
+          "fee_per_tx_lamports": {
+            "description": "The wallet's median transaction fee plus tip, lamports, charged to the\ncopier on every mirrored transaction.",
+            "type": "integer"
+          },
+          "positions": {
+            "description": "Positions the wallet opened in the window that the replay sampled: the\nmost recent ones, bounded per wallet.",
+            "type": "integer"
+          },
+          "positions_closed": {
+            "description": "Positions the wallet had sold in full by the end of the window; the\nrest are valued at the last price seen.",
+            "type": "integer"
           },
           "round_trip_mints": {
-            "description": "Positions (mints) that had BOTH a buy and a sell in the window — the\nonly ones a round-trip cost can be measured on.",
+            "description": "Positions with at least one sell in the window.",
             "type": "integer"
+          },
+          "sample_from_ts": {
+            "description": "Earliest position open in the sample, Unix seconds; 0 when nothing was\nsampled.",
+            "type": "integer"
+          },
+          "size_lamports": {
+            "description": "Size of each mirrored buy, lamports.",
+            "type": "integer"
+          },
+          "txs_per_position": {
+            "description": "Mean number of transactions, buys plus sells, per sampled position.",
+            "type": "number"
           },
           "wallet": {
             "type": "string"
