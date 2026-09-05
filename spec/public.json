@@ -1438,6 +1438,101 @@
         "operationId": "getMintsByPubkeySafetyEvents"
       }
     },
+    "/api/mints/{pubkey}/snipers": {
+      "get": {
+        "description": "Launch snipers of one mint (wallets whose first buy is within 30s of the mint's first observed swap) — the SAME set `/risk` counts — in the top-traders row shape: on-chain balance and % of circulating supply, `trader_token_stats` PnL columns, swaps-derived first buy. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort key (balance|holding_pnl|pnl|volume|swaps|recent, default balance)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Max rows (default 50, max 500)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderRow"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Mint Snipers",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeySnipers"
+      }
+    },
     "/api/mints/{pubkey}/stats": {
       "get": {
         "description": "Returns per-mint windowed stats (volume, price_change, swap_count, buy/sell split) for all four windows (1m/5m/1h/24h) in one response.",
@@ -7130,6 +7225,10 @@
           "pool": {
             "type": "string"
           },
+          "quote_mint": {
+            "description": "QuoteMint is the pool's quote side under CA's registry ranking (USDC >\nUSDT > USD1 > WSOL), so a SOL/USDC pool quotes in USDC. This market's\ncandle prices and quote volumes are denominated in it, and the live\nchart folds only ticks that carry the same quote.",
+            "type": "string"
+          },
           "sol_volume_lamports": {
             "type": "integer"
           },
@@ -7334,7 +7433,7 @@
             "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nORGANIC distribution slot, the low_organic_activity risk rule and\nsort=organic. Best-effort list decoration; nil before the migration or\nwhen the batch read fails."
           },
           "unique_traders": {
-            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable.",
+            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable. A quote-registry mint (WSOL, the USD stables) has\nno trader_token_stats rows, so its detail counts the distinct wallets of\nits last 30 days of per-leg dex_swaps instead.",
             "type": "integer"
           },
           "verified": {
