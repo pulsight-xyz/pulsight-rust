@@ -1011,6 +1011,196 @@
         "operationId": "getMintsByPubkeyActivity"
       }
     },
+    "/api/mints/{pubkey}/bundlers": {
+      "get": {
+        "description": "Launch bundlers of one mint (wallets that bought in a same-slot cluster of ≥3 buyers taking ≥5% of supply within 300s of the first observed swap) — the SAME set `/risk` counts — in the top-traders row shape plus `initial_pct_of_supply` (net launch acquisition as % of total supply) and `bundle_slot`. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort key (balance|holding_pnl|pnl|volume|swaps|recent, default balance)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Max rows (default 50, max 500)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderRow"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Mint Bundlers",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyBundlers"
+      }
+    },
+    "/api/mints/{pubkey}/insiders": {
+      "get": {
+        "description": "Insiders of one mint (wallets reached from the creator over launch-window token transfers, custodial hops excluded) — the SAME set `/risk` counts — in the top-traders row shape. Empty until the mint's first fold when token-program capture has no transfers for it. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort key (balance|holding_pnl|pnl|volume|swaps|recent, default balance)",
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Max rows (default 50, max 500)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderRow"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Mint Insiders",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyInsiders"
+      }
+    },
     "/api/mints/{pubkey}/lp-events": {
       "get": {
         "description": "Recent liquidity-pool add/remove/burn events for a mint (newest first), from `lp_events`. Sparse where upstream doesn't yet extract LP for a DEX; returns an empty array then.",
@@ -7495,6 +7685,9 @@
             "description": "Distinct is_arb transactions for this (trader, mint). Same rationale\nas TraderTokenPosition.ArbTxCount: shown alongside buy/sell, never\nsubtracted, so lopsided counts on arbitrage wallets are legible.",
             "type": "integer"
           },
+          "bundle_slot": {
+            "type": "integer"
+          },
           "buy_tx_count": {
             "type": "integer"
           },
@@ -7513,6 +7706,10 @@
           },
           "holding_pnl_lamports": {
             "type": "integer"
+          },
+          "initial_pct_of_supply": {
+            "description": "InitialPctOfSupply is a bundler's net launch acquisition as % of total\nsupply, and BundleSlot the first bundle slot it bought in. Both are set\nonly on the bundlers path.",
+            "type": "number"
           },
           "is_bundler": {
             "type": "boolean"
@@ -7534,7 +7731,7 @@
             "type": "string"
           },
           "pct_of_supply": {
-            "description": "PctOfSupply is the holder's % of circulating supply, set on the\ntop-holders path (now sourced from on-chain holder_balances). nil on the\ntop-traders path. IsSniper/IsBundler/IsInsider flag cohort membership\n(bundler/insider populate in phase 2 — always false until then).",
+            "description": "PctOfSupply is the holder's % of circulating supply, set on the\ntop-holders and cohort paths (sourced from on-chain holder_balances).\nnil on the top-traders path. IsSniper/IsBundler/IsInsider flag cohort\nmembership on every per-mint trader list.",
             "type": "number"
           },
           "realized_profit": {
