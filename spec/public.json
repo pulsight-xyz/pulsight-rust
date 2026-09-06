@@ -290,6 +290,72 @@
         "operationId": "getBacktestsById"
       }
     },
+    "/api/backtests/{id}/declines": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Backtest ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (default 200, max 2000)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.BacktestDecline"
+                  },
+                  "type": "array"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List Backtest Declines",
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "getBacktestsByIdDeclines"
+      }
+    },
     "/api/backtests/{id}/trades": {
       "get": {
         "parameters": [
@@ -8663,19 +8729,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
-          "3m",
           "1d",
           "7d",
           "30d",
-          "all"
+          "all",
+          "3m"
         ],
         "type": "string",
         "x-enum-varnames": [
-          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll"
+          "WindowAll",
+          "Window3m"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -8769,7 +8835,7 @@
             "type": "number"
           },
           "max_buys_per_open_position": {
-            "description": "MaxBuysPerOpenPosition is the max number of buys (initial open + adds)\nallowed within ONE open position. 0 ⇒ 1 — the historical single-buy-\nper-position behaviour; read it through EffectiveMaxBuysPerOpenPosition.\nRaise it above 1 to enable DCA / pyramiding.",
+            "description": "MaxBuysPerOpenPosition is the max number of buys (initial open + adds)\nallowed within ONE open position. An explicit value caps every buy exec.\nAbsent (0) resolves per exec kind — read it through BuyCapFor: an Emit\nbuy gets 1 (no adds — the historical single-buy-per-position behaviour;\nraise it for DCA / pyramiding), a Copy buy gets NO cap, because a\nmirror's add cadence is the target's, not ours — refusing their adds\nwhile mirroring their sells pro-rata decays the position to dust.",
             "type": "integer"
           },
           "max_buys_per_token_per_hour": {
@@ -10024,6 +10090,63 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_usecases_backtest.BacktestDecline": {
+        "properties": {
+          "backtest_id": {
+            "type": "string"
+          },
+          "detail": {
+            "description": "Detail is a short human-readable specific for the reason (the cap\nthat was full, the drift that tripped the gate, …).",
+            "type": "string"
+          },
+          "fee_sol": {
+            "description": "FeeSol + TipSol are non-zero only on `reverted`: the priority fee and\ntip the failed tx still paid (already inside the summary's totals).",
+            "type": "number"
+          },
+          "idx": {
+            "type": "integer"
+          },
+          "landing_drift_bps": {
+            "description": "LandingDriftBps is the adverse-signed drift that tripped a `reverted`\nfill's slippage gate. Nil otherwise.",
+            "type": "number"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "pool": {
+            "description": "Pool is the market the triggering swap executed in.",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.DeclineReason"
+          },
+          "requested_sol": {
+            "description": "RequestedSol is the SOL the buy would have spent, or the SOL the sell\nwould have realised, had it filled. 0 when sizing itself failed.",
+            "type": "number"
+          },
+          "side": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.Side"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TradeSource"
+              }
+            ],
+            "description": "Source is the exec kind that wanted to fire."
+          },
+          "tip_sol": {
+            "type": "number"
+          },
+          "triggering_swap_sig": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_usecases_backtest.BacktestPosition": {
         "properties": {
           "cost_basis_sol": {
@@ -10188,6 +10311,10 @@
             "description": "AvgLandingDriftBps is the mean ADVERSE-signed drift (bps) actually\ncrossed by the run's FILLED copies — what latency cost on the fills that\nwent through (reverted ones are excluded; their cost shows as\nRevertFeesSol + missed entries). Nil when the run had no landing fills.",
             "type": "number"
           },
+          "copies_declined": {
+            "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE refused: cooldown, sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit — plus the sells this run sat\nout because the target only sold tokens it had never mirrored. Reverts\nand unpriced skips have their own counters and are not in here. Every\none is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
+            "type": "integer"
+          },
           "copies_reverted": {
             "description": "CopiesReverted counts copy fills the slippage gate REJECTED: the pool's\nlanding price had drifted past the exec's slippage_bps between the\ntarget's swap and our simulated landing. Unlike CopiesSkippedUnpriced\nthis is an EXECUTION OUTCOME, not a coverage gap — the data was fine,\nthe market moved, and a live bot's tx would have landed and reverted.\nEach revert still pays its tip + priority fee (folded into\nFeesPaidSol/TipsPaidSol and broken out in RevertFeesSol). Only possible\non latency_slots > 0 runs. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
@@ -10344,6 +10471,33 @@
           }
         },
         "type": "object"
+      },
+      "pulsight_internal_core_usecases_backtest.DeclineReason": {
+        "enum": [
+          "cooldown",
+          "unpriced",
+          "zero_size",
+          "size_out_of_range",
+          "max_buys_per_position",
+          "exposure_cap",
+          "no_bracket",
+          "rate_limited",
+          "reverted",
+          "unmirrored"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "DeclineCooldown",
+          "DeclineUnpriced",
+          "DeclineZeroSize",
+          "DeclineSizeOutOfRange",
+          "DeclineMaxBuysPerPosition",
+          "DeclineExposureCap",
+          "DeclineNoBracket",
+          "DeclineRateLimited",
+          "DeclineReverted",
+          "DeclineUnmirrored"
+        ]
       },
       "pulsight_internal_core_usecases_backtest.PreviewMarker": {
         "properties": {
