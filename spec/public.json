@@ -7419,10 +7419,18 @@
           "as_of": {
             "type": "string"
           },
+          "circulating_supply": {
+            "description": "CirculatingSupply is the supply MarketCapUsd was computed against, in\nWHOLE tokens (decimals already applied). It rides along so a client\npatching the price can carry the market cap with it on the server's own\nbasis instead of re-deriving the figure from raw supply and decimals.\nnil when supply or decimals are unknown, exactly when MarketCapUsd is.",
+            "type": "number"
+          },
           "market_cap_usd": {
             "type": "number"
           },
           "mint": {
+            "type": "string"
+          },
+          "price_basis_pool": {
+            "description": "PriceBasisPool is the pool PriceUsd was read from: the mint's DOMINANT\npool by 24h quote volume, which is the basis the whole price surface\nuses so a dust side-market's prints cannot move the displayed number.\nA client that patches the price from the live swap stream between reads\nmust believe prints from THIS pool only — and gets the answer from the\nserver precisely so it never has to resolve a dominant pool of its own.\nnil whenever PriceUsd is.",
             "type": "string"
           },
           "price_usd": {
