@@ -168,7 +168,7 @@
               }
             }
           },
-          "description": "Token-selection source (def | strategy_id) + resolution window",
+          "description": "Token-selection source (def | strategy_id) + resolution window; the mints returned are the ones matching at the window's END",
           "required": true
         },
         "responses": {
@@ -4244,7 +4244,7 @@
             }
           },
           {
-            "description": "Comma list of DISPLAY-only window families to hydrate: 1d, all. Costs one extra query per page; sorting and f= filters are unaffected (they read 7d/30d board columns).",
+            "description": "Comma list of DISPLAY-only window families to hydrate: 1d, all. Costs one extra query per page; sorting is unaffected (it reads 7d/30d board columns) and f= filters read 1d/7d/30d board columns.",
             "in": "query",
             "name": "extra_windows",
             "schema": {
@@ -8619,19 +8619,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
