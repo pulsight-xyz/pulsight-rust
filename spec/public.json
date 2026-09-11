@@ -1267,6 +1267,64 @@
         "operationId": "getMintsByPubkeyInsiders"
       }
     },
+    "/api/mints/{pubkey}/live": {
+      "get": {
+        "description": "Returns the mint's live header figures — latest price, market cap and lifetime distinct traders — on the same basis as the corresponding fields of GET /api/mints/{pubkey}, from sources that update with ingest rather than on a refresh cadence. Intended for polling: it reads none of the identity row's enrichment (authorities, bonding curve, dev holdings, risk cohorts). Fields are independently optional — an unpriceable mint reports no price, and a quote-registry mint (WSOL, the USD stables) reports no trader count.",
+        "parameters": [
+          {
+            "description": "Mint pubkey",
+            "in": "path",
+            "name": "pubkey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintLiveMetrics"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Get Mint Live Metrics",
+        "tags": [
+          "Mints"
+        ],
+        "operationId": "getMintsByPubkeyLive"
+      }
+    },
     "/api/mints/{pubkey}/lp-events": {
       "get": {
         "description": "Recent liquidity-pool add/remove/burn events for a mint (newest first), from `lp_events`. Sparse where upstream doesn't yet extract LP for a DEX; returns an empty array then.",
@@ -7356,6 +7414,28 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.MintLiveMetrics": {
+        "properties": {
+          "as_of": {
+            "type": "string"
+          },
+          "market_cap_usd": {
+            "type": "number"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "price_usd": {
+            "description": "PriceUsd / MarketCapUsd carry MintRow.PriceUsd and MintRow.MarketCapUsd\nverbatim, including their nil conditions (no WSOL pool, unknown\ndecimals, no SOL/USD reference, absent supply).",
+            "type": "number"
+          },
+          "unique_traders": {
+            "description": "UniqueTraders is MintRow.UniqueTraders read straight off the insert-time\nuniq plane, so it is as fresh as ingest rather than as fresh as the\nholder-fold refresh that stamps the identity row. nil without the plane:\nthis route never falls back to the lifetime position-table fold, which is\nthe read it exists to stop paying at poll cadence. A quote-registry mint\nhas no rows on that plane and so never reports a count here.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.MintMarket": {
         "properties": {
           "dex": {
@@ -7579,7 +7659,7 @@
             "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nORGANIC distribution slot, the low_organic_activity risk rule and\nsort=organic. Best-effort list decoration; nil before the migration or\nwhen the batch read fails."
           },
           "unique_traders": {
-            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint (all-time count() over trader_token_stats, the same\nprojection-served source as HolderCount). Distinct from TraderCount\n(which is a WINDOWED, HLL-approximate count over the `?hours` gate and\nis set on the list path only): UniqueTraders is exact and lifetime, so\nthe list column and the /api/mints/:pubkey detail render the same value.\nPopulated on BOTH paths, best-effort: nil when the trader_token_stats\nread is unavailable. A quote-registry mint (WSOL, the USD stables) has\nno trader_token_stats rows, so its detail counts the distinct wallets of\nits last 30 days of per-leg dex_swaps instead.",
+            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint, folded from the insert-time uniq plane (`mint_trader_uniq`)\nthat accumulates one `uniq` state per mint off `swaps`. Distinct from\nTraderCount (a WINDOWED count over the `?hours` gate, list path only):\nUniqueTraders is LIFETIME, so the list column and the\n/api/mints/:pubkey detail render the same value. Exact below ~10k\ndistinct wallets and HLL-approximate above — a trader set only ever\ngrows, which is what lets it be an accumulator at all (a holder set does\nnot, and HolderCount keeps its fold). Populated on BOTH paths,\nbest-effort: nil when the read is unavailable. A quote-registry mint\n(WSOL, the USD stables) never appears as `swaps.mint`, so its detail\ncounts the distinct wallets of its last 30 days of per-leg dex_swaps\ninstead.",
             "type": "integer"
           },
           "verified": {
