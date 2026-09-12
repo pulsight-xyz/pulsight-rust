@@ -424,7 +424,7 @@
     },
     "/api/cashback/leaderboard": {
       "get": {
-        "description": "Wallets ranked by pump cashback over a window. Accepts the same composable `f=` filter clauses as /api/traders (repeated `f=key|op|value`), plus cashback-specific sorts. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger (they undercount once rows age out, never invent).",
+        "description": "Wallets ranked by what pump paid them over a window, across both programs: holder rewards received and cashback claimed. The default rank is their sum, both cash basis — never cashback earned, which is an accrual of the same money. Accepts the same composable `f=` filter clauses as /api/traders (repeated `f=key|op|value`), plus the rewards sorts. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger (they undercount once rows age out, never invent).",
         "parameters": [
           {
             "description": "1d|7d|30d|all (default 7d)",
@@ -435,7 +435,7 @@
             }
           },
           {
-            "description": "cashback|cashback_claimed|cashback_share|cashback_claim_count|cashback_volume (default cashback)",
+            "description": "rewards_total|holder_rewards|holder_reward_payouts|cashback|cashback_claimed|cashback_share|cashback_claim_count|cashback_volume (default rewards_total)",
             "in": "query",
             "name": "sort_by",
             "schema": {
@@ -502,7 +502,7 @@
             }
           }
         },
-        "summary": "Pump cashback leaderboard",
+        "summary": "Pump rewards leaderboard",
         "tags": [
           "Cashback"
         ],
@@ -511,7 +511,7 @@
     },
     "/api/cashback/summary": {
       "get": {
-        "description": "Pool totals, the median wallet and the top earner for a window. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger.",
+        "description": "Pool totals across both programs, the median wallet and the top earner for a window. Lifetime claimed and received figures are retention-bounded sums over the 75-day ledgers.",
         "parameters": [
           {
             "description": "1d|7d|30d|all (default 7d)",
@@ -544,7 +544,7 @@
             }
           }
         },
-        "summary": "Pump cashback board summary",
+        "summary": "Pump rewards board summary",
         "tags": [
           "Cashback"
         ],
@@ -792,11 +792,16 @@
             }
           },
           {
-            "description": "Activity-gate lookback hours (1..168, default 24)",
+            "description": "Activity-gate lookback hours (1, 6 or 24; default 24)",
             "in": "query",
             "name": "hours",
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "enum": [
+                1,
+                6,
+                24
+              ]
             }
           },
           {
@@ -4988,7 +4993,7 @@
             }
           }
         },
-        "summary": "Pump cashback rewards of a wallet",
+        "summary": "Pump rewards of a wallet",
         "tags": [
           "Traders"
         ],
@@ -4997,7 +5002,7 @@
     },
     "/api/traders/{walletAddress}/cashback/claims": {
       "get": {
-        "description": "One wallet's claim_cashback executions, newest first, paged. Read from the raw claim ledger (75-day retention): older claims have aged out; the program-reported anchors on the cashback panel carry the true all-time totals. Amounts are in the claim's quote-mint base units (lamports for WSOL rows, which is nearly all of them).",
+        "description": "One wallet's reward events, newest first, paged: both its claim_cashback executions and the holder-reward payouts pushed to it, interleaved in one timestamp order and told apart by `kind`. A claim carries the pump program it swept; a payout carries the coin that paid it. Read from the raw ledgers (75-day retention): older events have aged out; the program-reported anchors on the rewards panel carry the true all-time totals. Amounts are in the event's quote-mint base units (lamports for WSOL rows, which is nearly all of them), and `amount_lamports` is zero on a payout whose quote could not be priced in SOL — `priced` says which.",
         "parameters": [
           {
             "description": "Wallet address",
@@ -5047,7 +5052,7 @@
             }
           }
         },
-        "summary": "Cashback claim history of a wallet",
+        "summary": "Reward history of a wallet",
         "tags": [
           "Cashback"
         ],
@@ -6900,6 +6905,13 @@
           "first_seen_ms": {
             "type": "integer"
           },
+          "holder_reward_payouts": {
+            "type": "integer"
+          },
+          "holder_rewards_lamports": {
+            "description": "HolderRewardsLamports / HolderRewardPayouts — what pump PAID this wallet\nin holder rewards in the window (CA 000221), in priced lamports, and the\nnumber of payouts behind it. Holder rewards are pushed, not claimed, so\nthis one figure is already a receipt. RewardsTotalLamports is the board's\ndefault rank: cashback CLAIMED plus holder rewards RECEIVED, both cash\nbasis — never cashback earned, which is an accrual of the same money.",
+            "type": "integer"
+          },
           "last_active_ms": {
             "type": "integer"
           },
@@ -6912,6 +6924,9 @@
           },
           "rank": {
             "description": "Rank is 1-based within the requested window + filters (offset-aware).",
+            "type": "integer"
+          },
+          "rewards_total_lamports": {
             "type": "integer"
           },
           "tags": {
@@ -6950,11 +6965,21 @@
             "description": "Earners / EarnedLamports — wallets with any earned cashback in the\nwindow, and their summed earnings (the \"% of pool\" denominator).",
             "type": "integer"
           },
+          "holder_reward_payouts": {
+            "type": "integer"
+          },
+          "holder_rewards_lamports": {
+            "description": "HolderRewardsLamports / HolderRewardPayouts / RewardsTotalLamports —\nthe same population's holder-reward side and the merged cash-basis\ntotal the board ranks on by default.",
+            "type": "integer"
+          },
           "median_earned_lamports": {
             "description": "Population marks.",
             "type": "integer"
           },
           "rank1_earned_lamports": {
+            "type": "integer"
+          },
+          "rewards_total_lamports": {
             "type": "integer"
           },
           "window": {
@@ -6965,8 +6990,23 @@
       },
       "pulsight_internal_core_domain_aggregator.CashbackClaimRow": {
         "properties": {
+          "amount": {
+            "description": "Amount is the raw payout in QuoteMint's base units, and Priced says\nwhether AmountLamports carries a SOL valuation of it. Both are zero on\na claim, whose AmountLamports is already lamports.",
+            "type": "integer"
+          },
           "amount_lamports": {
             "type": "integer"
+          },
+          "kind": {
+            "description": "Kind is \"cashback_claim\" or \"holder_reward\".",
+            "type": "string"
+          },
+          "mint": {
+            "description": "Mint is the coin that paid a holder reward; empty on a claim, which is\nper-accumulator rather than per-coin.",
+            "type": "string"
+          },
+          "priced": {
+            "type": "boolean"
           },
           "program": {
             "type": "string"
@@ -8505,6 +8545,13 @@
             "description": "EarnedLamports — cashback ACCRUED by the window's swaps (the exact\nper-swap amounts from the pump trade events, WSOL-quoted markets\nonly). Informational: the net-PnL formulas fold CLAIMED, not this.",
             "type": "integer"
           },
+          "holder_reward_payouts": {
+            "type": "integer"
+          },
+          "holder_rewards_lamports": {
+            "description": "The holder-reward half of the same panel (CA 000220). pump PUSHES\nthese, so there is no accrued/claimed pair and nothing to claim:\nHolderRewardsLamports is already a receipt, and the payout count is\nthe cadence figure ClaimCount is for cashback. Lifetime is exact —\nthe receipt ledger carries no TTL — but both lamport figures count\nonly payouts whose quote could be priced in SOL, because a coin\npaired with another token pays in that token (CA r89).",
+            "type": "integer"
+          },
           "last_claim_at": {
             "type": "string"
           },
@@ -8513,6 +8560,12 @@
           },
           "lifetime_earned_lamports": {
             "description": "LifetimeEarnedLamports is exact: it comes from `trader_stats.cashback`,\nwhich is untimed, WSOL-only by construction and rebuildable from\n`swaps`. LifetimeClaimedLamports is bounded by the raw claim ledger's\n75-day retention (CA 000098) — the same compromise reliability's \"all\"\nwindow makes, undercounting rather than inventing. ProgramTotals below\ncarries the program's own all-time figures beside it.",
+            "type": "integer"
+          },
+          "lifetime_holder_reward_payouts": {
+            "type": "integer"
+          },
+          "lifetime_holder_rewards_lamports": {
             "type": "integer"
           },
           "program_totals": {
@@ -8526,7 +8579,7 @@
             "type": "string"
           },
           "recent_claims": {
-            "description": "RecentClaims — the wallet's latest claims, newest first (≤10).\nAmountLamports is in the claim's quote-mint base units — lamports for\nWSOL rows, which is nearly all of them.",
+            "description": "RecentClaims — the wallet's latest REWARDS, newest first (≤10):\ncashback claims and holder-reward payouts interleaved by timestamp,\ntold apart by Kind. AmountLamports is in the row's quote-mint base\nunits — lamports for WSOL rows, which is nearly all of the claims.",
             "items": {
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackClaimRow"
             },
@@ -8707,19 +8760,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
-          "3m",
           "1d",
           "7d",
           "30d",
-          "all"
+          "all",
+          "3m"
         ],
         "type": "string",
         "x-enum-varnames": [
-          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll"
+          "WindowAll",
+          "Window3m"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -9320,6 +9373,31 @@
           },
           "failed_txs_all": {
             "type": "integer"
+          },
+          "holder_reward_payouts_1d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_30d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_7d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_all": {
+            "type": "integer"
+          },
+          "holder_rewards_1d": {
+            "type": "number"
+          },
+          "holder_rewards_30d": {
+            "type": "number"
+          },
+          "holder_rewards_7d": {
+            "description": "Pump holder rewards, lamports. Pushed rather than claimed, so the one\nfigure is already a receipt and is what net PnL folds; the payout count\ncounts every payout, including one on a coin whose quote could not be\npriced in SOL and therefore adds no lamports.",
+            "type": "number"
+          },
+          "holder_rewards_all": {
+            "type": "number"
           },
           "id": {
             "type": "string"
@@ -10715,6 +10793,30 @@
           "has_avatar": {
             "type": "boolean"
           },
+          "holder_reward_payouts_1d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_30d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_7d": {
+            "type": "integer"
+          },
+          "holder_reward_payouts_all": {
+            "type": "integer"
+          },
+          "holder_rewards_1d": {
+            "type": "number"
+          },
+          "holder_rewards_30d": {
+            "type": "number"
+          },
+          "holder_rewards_7d": {
+            "type": "number"
+          },
+          "holder_rewards_all": {
+            "type": "number"
+          },
           "holding_pnl_lamports": {
             "description": "HoldingPnlLamports is the wallet's current unrealised PnL across\nall open positions, in lamports. Nil when CA has no live price\nquote for any of the held mints.",
             "type": "number"
@@ -11098,7 +11200,7 @@
     },
     {
       "name": "Cashback",
-      "x-displayName": "Cashback"
+      "x-displayName": "Rewards"
     },
     {
       "name": "Credits",
