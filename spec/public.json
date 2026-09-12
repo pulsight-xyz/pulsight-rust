@@ -8707,19 +8707,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
