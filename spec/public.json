@@ -7001,8 +7001,14 @@
             "description": "Kind is \"cashback_claim\" or \"holder_reward\".",
             "type": "string"
           },
+          "logo_uri": {
+            "type": "string"
+          },
           "mint": {
             "description": "Mint is the coin that paid a holder reward; empty on a claim, which is\nper-accumulator rather than per-coin.",
+            "type": "string"
+          },
+          "name": {
             "type": "string"
           },
           "priced": {
@@ -7015,6 +7021,10 @@
             "type": "string"
           },
           "signature": {
+            "type": "string"
+          },
+          "symbol": {
+            "description": "Symbol / Name / LogoURI name the paying coin so a payout renders as a\ntoken rather than a raw address. Empty on a claim, and on a coin whose\nmetadata has not been fetched yet.",
             "type": "string"
           },
           "timestamp": {
@@ -8760,19 +8770,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -9393,7 +9403,6 @@
             "type": "number"
           },
           "holder_rewards_7d": {
-            "description": "Pump holder rewards, lamports. Pushed rather than claimed, so the one\nfigure is already a receipt and is what net PnL folds; the payout count\ncounts every payout, including one on a coin whose quote could not be\npriced in SOL and therefore adds no lamports.",
             "type": "number"
           },
           "holder_rewards_all": {
@@ -9542,6 +9551,19 @@
             "type": "number"
           },
           "rebalancing_ratio": {
+            "type": "number"
+          },
+          "rewards_total_1d": {
+            "type": "number"
+          },
+          "rewards_total_30d": {
+            "type": "number"
+          },
+          "rewards_total_7d": {
+            "description": "Pump holder rewards, lamports. Pushed rather than claimed, so the one\nfigure is already a receipt and is what net PnL folds; the payout count\ncounts every payout, including one on a coin whose quote could not be\npriced in SOL and therefore adds no lamports.",
+            "type": "number"
+          },
+          "rewards_total_all": {
             "type": "number"
           },
           "risk_level": {
@@ -10573,7 +10595,14 @@
             "type": "integer"
           },
           "fees": {
-            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nplus the day's CLAIMED pump cashback (cash basis, the one positive\ncomponent), with `net = profit - fees - tips - failed_cost +\ncashback` (profit already includes the arbitrage take-home). The charts plot NET as the headline series; `profit` stays\nas the flat/gross component.",
+            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nagainst what pump paid the wallet that day — cashback CLAIMED and\nholder rewards RECEIVED, both cash basis — with `net = profit - fees\n- tips - failed_cost + cashback + holder_rewards` (profit already\nincludes the arbitrage take-home). The charts plot NET as the headline\nseries; `profit` stays as the flat/gross component.",
+            "type": "integer"
+          },
+          "holder_reward_payouts": {
+            "type": "integer"
+          },
+          "holder_rewards": {
+            "description": "HolderRewards is the day's holder-reward payouts valued in SOL, and\nHolderRewardPayouts how many payouts there were. A payout in a quote\nwe cannot price in SOL adds nothing to the value but still counts, so\na day can carry payouts with zero lamports.",
             "type": "integer"
           },
           "net": {
@@ -10976,6 +11005,18 @@
             "type": "number"
           },
           "rebalancing_ratio": {
+            "type": "number"
+          },
+          "rewards_total_1d": {
+            "type": "number"
+          },
+          "rewards_total_30d": {
+            "type": "number"
+          },
+          "rewards_total_7d": {
+            "type": "number"
+          },
+          "rewards_total_all": {
             "type": "number"
           },
           "risk_level": {
