@@ -5014,6 +5014,14 @@
             }
           },
           {
+            "description": "cashback_claim|holder_reward — omit for both",
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Page size (default 50, max 200)",
             "in": "query",
             "name": "limit",
@@ -6994,11 +7002,15 @@
             "description": "Amount is the raw payout in QuoteMint's base units, and Priced says\nwhether AmountLamports carries a SOL valuation of it. Both are zero on\na claim, whose AmountLamports is already lamports.",
             "type": "integer"
           },
+          "amount_gross": {
+            "description": "AmountGross is a cashback claim's RAW swept amount before the part the\nwallet immediately re-parked; AmountLamports is what it KEPT. They differ\non a park-resweep, where kept is legitimately zero and only the gross\nshows a claim happened at all. Zero on a payout, which cannot be parked.",
+            "type": "integer"
+          },
           "amount_lamports": {
             "type": "integer"
           },
           "kind": {
-            "description": "Kind is \"cashback_claim\" or \"holder_reward\".",
+            "description": "Kind is RewardKindCashbackClaim or RewardKindHolderReward.",
             "type": "string"
           },
           "logo_uri": {
@@ -7011,13 +7023,30 @@
           "name": {
             "type": "string"
           },
+          "price_basis": {
+            "description": "PriceBasis says HOW AmountLamports was arrived at: \"exact\" when the\npayout was already in SOL, \"market\" when it was valued through the\nquote's own SOL market at that minute, \"unpriced\" when no value could\nbe stated. A market figure moves with the quote; an exact one is the\namount received. Empty on a cashback claim.",
+            "type": "string"
+          },
           "priced": {
             "type": "boolean"
           },
           "program": {
             "type": "string"
           },
+          "quote_decimals": {
+            "type": "integer"
+          },
+          "quote_logo_uri": {
+            "type": "string"
+          },
           "quote_mint": {
+            "type": "string"
+          },
+          "quote_name": {
+            "type": "string"
+          },
+          "quote_symbol": {
+            "description": "QuoteSymbol / QuoteName / QuoteLogoURI name QuoteMint — the token the\nreward was actually paid in, which on a holder-rewards coin is its\npool's quote and only rarely WSOL. QuoteDecimals scales Amount into\nwhole tokens and is -1 when unknown; it is per-token (PUMP 6, ZEC 8,\nXMR 12), so a reader must not assume a default.",
             "type": "string"
           },
           "signature": {
@@ -7040,6 +7069,10 @@
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackClaimRow"
             },
             "type": "array"
+          },
+          "kind": {
+            "description": "Kind is the reward kind this page was filtered to, empty when it carries\nboth. Total counts the same set the items come from, so a caller never\npages one kind against the other's count.",
+            "type": "string"
           },
           "limit": {
             "type": "integer"
