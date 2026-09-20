@@ -424,7 +424,7 @@
     },
     "/api/cashback/leaderboard": {
       "get": {
-        "description": "Wallets ranked by what pump paid them over a window, across both programs: holder rewards received and cashback claimed. The default rank is their sum, both cash basis — never cashback earned, which is an accrual of the same money. Accepts the same composable `f=` filter clauses as /api/traders (repeated `f=key|op|value`), plus the rewards sorts. Lifetime claimed figures are retention-bounded sums over the 75-day claim ledger (they undercount once rows age out, never invent).",
+        "description": "Wallets ranked by what pump paid them over a window, across both programs: holder rewards received and cashback claimed. The default rank is their sum, both cash basis — never cashback earned, which is an accrual of the same money. Accepts the same composable `f=` filter clauses as /api/traders (repeated `f=key|op|value`), plus the rewards sorts.",
         "parameters": [
           {
             "description": "1d|7d|30d|all (default 7d)",
@@ -432,6 +432,15 @@
             "name": "window",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Currency the board is ranked and filtered in: sol (lamports) or usd (micro-USD stamped at execution); money clause values are whole units of it. Every row carries both currencies (`_usd` twins).",
+            "in": "query",
+            "name": "unit",
+            "schema": {
+              "type": "string",
+              "default": "sol"
             }
           },
           {
@@ -511,7 +520,7 @@
     },
     "/api/cashback/summary": {
       "get": {
-        "description": "Pool totals across both programs, the median wallet and the top earner for a window. Lifetime claimed and received figures are retention-bounded sums over the 75-day ledgers.",
+        "description": "Pool totals across both programs, the median wallet and the top earner for a window.",
         "parameters": [
           {
             "description": "1d|7d|30d|all (default 7d)",
@@ -751,7 +760,7 @@
     },
     "/api/mints": {
       "get": {
-        "description": "Returns the active-mint catalog with windowed stats. The activity gate is `hourly_mint_trader_activity`; rows ordered by distinct traders desc (the wash-resistant default — pass `sort=trades` for raw swap-count order). By default the list hides low-liquidity (dust / drained-pool) mints — see `min_pool_sol`.",
+        "description": "Returns the active-mint catalog with windowed stats: one page of the `mint_board` rows that traded inside the `hours` activity gate, ordered by distinct traders desc (the wash-resistant default — pass `sort=trades` for raw swap-count order). By default the list hides low-liquidity (dust / drained-pool) mints — see `min_pool`. Money floors and money sorts are read in `unit`; every row carries both currencies.",
         "parameters": [
           {
             "description": "Window (1m|5m|1h|24h)",
@@ -805,7 +814,64 @@
             }
           },
           {
-            "description": "Min window pool quote-reserves (liquidity), WSOL lamports. Omitted ⇒ a default ~1 SOL floor hides dust on untargeted browse; pass 0 to disable, or any value to override.",
+            "description": "Currency every money floor and money sort is read in: sol or usd. Each row carries both currencies (`_usd` twins) whatever the unit.",
+            "in": "query",
+            "name": "unit",
+            "schema": {
+              "type": "string",
+              "default": "sol"
+            }
+          },
+          {
+            "description": "Min window volume, in whole units of `unit` (SOL or USD, the row's stored figure).",
+            "in": "query",
+            "name": "min_volume",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min window buy volume, whole units of `unit`.",
+            "in": "query",
+            "name": "min_buy_volume",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min window sell volume, whole units of `unit`.",
+            "in": "query",
+            "name": "min_sell_volume",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min window net buy (buys − sells), whole units of `unit`.",
+            "in": "query",
+            "name": "min_net_buy",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min reference-pool depth (liquidity), whole units of `unit`. Omitted ⇒ a default dust floor (1 SOL / 200 USD) on untargeted browse; pass 0 to disable.",
+            "in": "query",
+            "name": "min_pool",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min LIFETIME network fees paid trading the mint (tx fees + tips), whole units of `unit` — the basis of each row's total_fees.",
+            "in": "query",
+            "name": "min_fees",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Lamport alias of min_pool, accepted only with unit=sol.",
             "in": "query",
             "name": "min_pool_sol",
             "schema": {
@@ -821,7 +887,7 @@
             }
           },
           {
-            "description": "Min LIFETIME total network fees paid trading the mint (tx fees + MEV tips), in lamports — the same basis as each row's total_fees_sol. Omitted ⇒ no floor.",
+            "description": "Lamport alias of min_fees, accepted only with unit=sol.",
             "in": "query",
             "name": "min_fees_sol",
             "schema": {
@@ -940,7 +1006,7 @@
     },
     "/api/mints/{pubkey}": {
       "get": {
-        "description": "Returns the mint's identity row (symbol, name, logo_uri, decimals, creator) from the CA catalog. 404 when the pubkey is not present — the enricher may not have seen this mint yet.",
+        "description": "Returns the mint's identity row (symbol, name, logo_uri, decimals, creator) with its `mint_wide` decorations. 404 when the mint is in neither the mint catalog nor the metadata catalog.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1084,7 +1150,7 @@
     },
     "/api/mints/{pubkey}/bundlers": {
       "get": {
-        "description": "Launch bundlers of one mint (wallets that bought in a same-slot cluster of ≥3 buyers taking ≥5% of supply within 300s of the first observed swap) — the SAME set `/risk` counts — in the top-traders row shape plus `initial_pct_of_supply` (net launch acquisition as % of total supply) and `bundle_slot`. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "description": "Launch bundlers of one mint (wallets that bought in a same-slot cluster of ≥3 buyers taking ≥5% of supply within 300s of the first observed swap) — the SAME set `/risk` counts — in the top-traders row shape plus `initial_pct_of_supply` (net launch acquisition as % of total supply). sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1179,7 +1245,7 @@
     },
     "/api/mints/{pubkey}/insiders": {
       "get": {
-        "description": "Insiders of one mint (wallets reached from the creator over launch-window token transfers, custodial hops excluded) — the SAME set `/risk` counts — in the top-traders row shape. Empty until the mint's first fold when token-program capture has no transfers for it. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "description": "Insiders of one mint (wallets reached from the creator over launch-window token transfers, custodial hops excluded) — the SAME set `/risk` counts — in the top-traders row shape. Empty until the insider-stats fold has stored the mint's set. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1759,7 +1825,7 @@
     },
     "/api/mints/{pubkey}/snipers": {
       "get": {
-        "description": "Launch snipers of one mint (wallets whose first buy is within 30s of the mint's first observed swap) — the SAME set `/risk` counts — in the top-traders row shape: on-chain balance and % of circulating supply, `trader_token_stats` PnL columns, swaps-derived first buy. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "description": "Launch snipers of one mint (wallets whose first buy is within 30s of the mint's first observed swap) — the SAME set `/risk` counts — in the top-traders row shape: on-chain balance and % of circulating supply, and the position's PnL and first buy. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1854,7 +1920,7 @@
     },
     "/api/mints/{pubkey}/stats": {
       "get": {
-        "description": "Returns per-mint windowed stats (volume, price_change, swap_count, buy/sell split) for all four windows (1m/5m/1h/24h) in one response.",
+        "description": "Returns per-mint windowed stats (volume, price_change, swap_count, buy/sell split) for every window (1m/5m/30m/1h/6h/12h/24h) in one response.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1912,7 +1978,7 @@
     },
     "/api/mints/{pubkey}/top-holders": {
       "get": {
-        "description": "Current holders (token_balance > 0) of one mint from `trader_token_stats`. sort ∈ {balance,holding_pnl,recent} (default balance). Paged via offset.",
+        "description": "Current holders of one mint by on-chain balance (`holder_accounts`, pool inventory excluded), each with its position figures. sort ∈ {balance,holding_pnl,recent} (default balance). Paged via offset.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1997,7 +2063,7 @@
     },
     "/api/mints/{pubkey}/top-traders": {
       "get": {
-        "description": "Per-(trader) leaderboard for one mint from `trader_token_stats` (all positions). sort ∈ {pnl,volume,swaps,recent} (default pnl). Paged via offset.",
+        "description": "Per-(trader) leaderboard for one mint off its `trader_positions` rows (all positions, closed ones included). sort ∈ {pnl,volume,swaps,recent} (default pnl). Paged via offset.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -2082,7 +2148,7 @@
     },
     "/api/mints/{pubkey}/traders/{trader}": {
       "get": {
-        "description": "Single per-(trader, mint) stats row (same shape as a top-traders row) from `trader_token_stats`. 404 when the trader never traded the mint.",
+        "description": "Single per-(trader, mint) stats row (same shape as a top-traders row). 404 when the trader neither traded nor holds the mint.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -3172,7 +3238,7 @@
     },
     "/api/swaps": {
       "get": {
-        "description": "Returns swaps filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. `pool` narrows to one or more markets and accepts the same repeated/comma-separated forms, OR-combined — pass the whole set when a token's market spans several pools (a graduated token's bonding curve plus the pool it migrated to). All time params are optional; with none supplied the latest swaps are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest swaps strictly older than the cursor — no lower bound, so pagination crosses activity gaps).",
+        "description": "Returns the ledger's trade rows filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. `pool` narrows to one or more markets by the trade's primary pool and accepts the same repeated/comma-separated forms, OR-combined — pass the whole set when a token's market spans several pools (a graduated token's bonding curve plus the pool it migrated to). Every money field is a `{sol, usd}` pair fixed at execution (lamports and micro-USD; null = unpriced). A quote-registry mint (SOL, USDC, USDT, USD1) lists the legs whose base it is, keyed by the leg, with no realized PnL. All time params are optional; with none supplied the latest rows are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest rows strictly older than the cursor — no lower bound, so pagination crosses activity gaps).",
         "parameters": [
           {
             "description": "Mint pubkey (optional; combinable with trader)",
@@ -3191,7 +3257,7 @@
             }
           },
           {
-            "description": "Market (pool pubkey) to scope swaps to; repeatable or comma-separated, OR-combined (optional)",
+            "description": "Market (pool pubkey) to scope trades to; repeatable or comma-separated, OR-combined (optional)",
             "in": "query",
             "name": "pool",
             "schema": {
@@ -3231,7 +3297,7 @@
             }
           },
           {
-            "description": "Cursor: return the latest swaps strictly before this Unix epoch timestamp (no lower bound)",
+            "description": "Cursor: return the latest rows strictly before this Unix epoch timestamp (no lower bound)",
             "in": "query",
             "name": "before_ts",
             "schema": {
@@ -3254,7 +3320,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/internal_adapters_primary_http_handler.swapEventRow"
+                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Trade"
                   },
                   "type": "array"
                 }
@@ -4281,12 +4347,12 @@
             }
           },
           {
-            "description": "Sort By field",
+            "description": "Sort key: realized_profit, winrate or last_active_ts",
             "in": "query",
             "name": "sort_by",
             "schema": {
               "type": "string",
-              "default": "total_profit_7d"
+              "default": "realized_profit"
             }
           },
           {
@@ -4307,11 +4373,20 @@
             }
           },
           {
-            "description": "Comma list of DISPLAY-only window families to hydrate: 1d, all. Costs one extra query per page; sorting is unaffected (it reads 7d/30d board columns) and f= filters read 1d/7d/30d board columns.",
+            "description": "Comma list of DISPLAY-only window families to include: 1d, all. They ride the same board row; sorting is unaffected (it reads 7d/30d board columns) and f= filters read 1d/7d/30d board columns.",
             "in": "query",
             "name": "extra_windows",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Currency the page is ranked, filtered and cursored in: sol (lamports) or usd (micro-USD stamped at execution). Money clause values are whole units of that currency. Every row carries both currencies (`_usd` twins) whatever the unit.",
+            "in": "query",
+            "name": "unit",
+            "schema": {
+              "type": "string",
+              "default": "sol"
             }
           }
         ],
@@ -4397,104 +4472,6 @@
           "Traders"
         ],
         "operationId": "getTraders"
-      }
-    },
-    "/api/traders/by-id/{traderID}": {
-      "get": {
-        "description": "Retrieves a trader's aggregated statistics by internal UUID.",
-        "parameters": [
-          {
-            "description": "Trader ID",
-            "in": "path",
-            "name": "traderID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.TraderListItem"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "ANALYTICS_UNAVAILABLE — the analytics store refused the read (concurrency/memory ceiling); retry after backoff",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "504": {
-            "description": "ANALYTICS_TIMEOUT — the read exceeded HEAVY_READ_BUDGET",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-token": []
-          }
-        ],
-        "summary": "Get Trader by ID",
-        "tags": [
-          "Traders"
-        ],
-        "operationId": "getTradersByIdByTraderID"
       }
     },
     "/api/traders/by-wallet/{walletAddress}": {
@@ -4598,7 +4575,7 @@
             }
           },
           {
-            "description": "Blockchain filter — only 'sol' is accepted post roadmap subtask 2.6 (BSC removed). Empty defaults to 'sol'.",
+            "description": "Blockchain filter — only 'sol' is accepted. Empty defaults to 'sol'.",
             "in": "query",
             "name": "chain",
             "schema": {
@@ -4728,228 +4705,6 @@
         "operationId": "getTradersSnapshot"
       }
     },
-    "/api/traders/{traderID}/daily-profits": {
-      "get": {
-        "description": "Retrieves aggregated daily profits for a specific trader.",
-        "parameters": [
-          {
-            "description": "Trader ID",
-            "in": "path",
-            "name": "traderID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Limit (1..200)",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "default": 50
-            }
-          },
-          {
-            "description": "Offset",
-            "in": "query",
-            "name": "offset",
-            "schema": {
-              "type": "integer",
-              "default": 0
-            }
-          },
-          {
-            "description": "Inclusive lower bound, YYYY-MM-DD",
-            "in": "query",
-            "name": "from_date",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Inclusive upper bound, YYYY-MM-DD",
-            "in": "query",
-            "name": "to_date",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Sort column",
-            "in": "query",
-            "name": "sort_by",
-            "schema": {
-              "type": "string",
-              "default": "date"
-            }
-          },
-          {
-            "description": "asc | desc",
-            "in": "query",
-            "name": "direction",
-            "schema": {
-              "type": "string",
-              "default": "desc"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.DailyProfitsResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-token": []
-          }
-        ],
-        "summary": "List Trader Daily Profits",
-        "tags": [
-          "Traders"
-        ],
-        "operationId": "getTradersByTraderIDDailyProfits"
-      }
-    },
-    "/api/traders/{traderID}/pnls": {
-      "get": {
-        "description": "Retrieves per-token PnL statistics for a specific trader.",
-        "parameters": [
-          {
-            "description": "Trader ID",
-            "in": "path",
-            "name": "traderID",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Search by token address or symbol",
-            "in": "query",
-            "name": "token_search",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Limit",
-            "in": "query",
-            "name": "limit",
-            "schema": {
-              "type": "integer",
-              "default": 50
-            }
-          },
-          {
-            "description": "Offset",
-            "in": "query",
-            "name": "offset",
-            "schema": {
-              "type": "integer",
-              "default": 0
-            }
-          },
-          {
-            "description": "Sort By field",
-            "in": "query",
-            "name": "sort_by",
-            "schema": {
-              "type": "string",
-              "default": "last_active_timestamp"
-            }
-          },
-          {
-            "description": "Sort Direction",
-            "in": "query",
-            "name": "direction",
-            "schema": {
-              "type": "string",
-              "default": "desc"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.PaginatedPnls"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-token": []
-          }
-        ],
-        "summary": "List Trader PnLs",
-        "tags": [
-          "Traders"
-        ],
-        "operationId": "getTradersByTraderIDPnls"
-      }
-    },
     "/api/traders/{walletAddress}/cashback": {
       "get": {
         "parameters": [
@@ -5002,7 +4757,7 @@
     },
     "/api/traders/{walletAddress}/cashback/claims": {
       "get": {
-        "description": "One wallet's reward events, newest first, paged: both its claim_cashback executions and the holder-reward payouts pushed to it, interleaved in one timestamp order and told apart by `kind`. A claim carries the pump program it swept; a payout carries the coin that paid it. Read from the raw ledgers (75-day retention): older events have aged out; the program-reported anchors on the rewards panel carry the true all-time totals. Amounts are in the event's quote-mint base units (lamports for WSOL rows, which is nearly all of them), and `amount_lamports` is zero on a payout whose quote could not be priced in SOL — `priced` says which.",
+        "description": "One wallet's reward events, newest first, paged: both its claim_cashback executions and the holder-reward payouts pushed to it, interleaved in one timestamp order and told apart by `kind`. A claim carries the pump program it swept; a payout carries the coin that paid it. Read from the `cashback_claims` and `holder_reward_payouts` ledgers. `amount` is in the event's quote-mint base units, `amount_lamports` and `amount_usd` are its value stamped at execution, and `amount_lamports` is zero on an event whose quote could not be priced in SOL — `priced` says which.",
         "parameters": [
           {
             "description": "Wallet address",
@@ -5210,7 +4965,7 @@
     },
     "/api/traders/{walletAddress}/pnl-series": {
       "get": {
-        "description": "Returns daily realised PnL points (oldest first) for a trader, sourced from the aggregator's `trader_daily_pnl_series` SQL function.",
+        "description": "Returns daily realised PnL points (oldest first) for a trader, folded from its `trader_hourly` rows: realized PnL with the arb take-home, the cost lines, the rewards, net PnL and the transaction record, in both currencies.",
         "parameters": [
           {
             "description": "Wallet Address",
@@ -6074,26 +5829,6 @@
         },
         "type": "object"
       },
-      "internal_adapters_primary_http_handler.PaginatedPnls": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Pnl"
-            },
-            "type": "array"
-          },
-          "limit": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "total": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "internal_adapters_primary_http_handler.StrategyListItem": {
         "properties": {
           "record": {
@@ -6295,11 +6030,23 @@
       },
       "internal_adapters_primary_http_handler.ohlcvRow": {
         "properties": {
+          "base_reserve": {
+            "type": "integer"
+          },
           "buy_volume_sol": {
-            "type": "number"
+            "type": "integer"
+          },
+          "buy_volume_usd": {
+            "type": "integer"
           },
           "close": {
             "type": "number"
+          },
+          "depth_sol": {
+            "type": "integer"
+          },
+          "depth_usd": {
+            "type": "integer"
           },
           "high": {
             "type": "number"
@@ -6310,11 +6057,14 @@
           "open": {
             "type": "number"
           },
-          "pool_sol": {
-            "type": "number"
+          "quote_reserve": {
+            "type": "integer"
           },
           "sell_volume_sol": {
-            "type": "number"
+            "type": "integer"
+          },
+          "sell_volume_usd": {
+            "type": "integer"
           },
           "swap_count": {
             "type": "integer"
@@ -6322,12 +6072,11 @@
           "time": {
             "type": "integer"
           },
-          "token_volume": {
-            "type": "number"
-          },
           "volume_sol": {
-            "description": "buy + sell",
-            "type": "number"
+            "type": "integer"
+          },
+          "volume_usd": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -6403,22 +6152,42 @@
             "description": "lamports",
             "type": "number"
           },
+          "avg_rp_1d_usd": {
+            "description": "micro-USD twins of the eight figures above",
+            "type": "number"
+          },
           "avg_rp_30d": {
             "description": "lamports",
+            "type": "number"
+          },
+          "avg_rp_30d_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "avg_rp_7d": {
             "description": "lamports",
             "type": "number"
           },
+          "avg_rp_7d_usd": {
+            "description": "micro-USD",
+            "type": "number"
+          },
           "avg_rp_all": {
             "description": "lamports, per-mint over the wallet's life",
+            "type": "number"
+          },
+          "avg_rp_all_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "avg_sells_per_token": {
             "type": "number"
           },
           "holding_pnl_lamports": {
+            "type": "number"
+          },
+          "holding_pnl_usd": {
+            "description": "micro-USD, stamped at execution",
             "type": "number"
           },
           "med_buys_per_token": {
@@ -6434,16 +6203,32 @@
             "description": "lamports",
             "type": "number"
           },
+          "med_rp_1d_usd": {
+            "description": "micro-USD",
+            "type": "number"
+          },
           "med_rp_30d": {
             "description": "lamports",
+            "type": "number"
+          },
+          "med_rp_30d_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "med_rp_7d": {
             "description": "lamports",
             "type": "number"
           },
+          "med_rp_7d_usd": {
+            "description": "micro-USD",
+            "type": "number"
+          },
           "med_rp_all": {
             "description": "lamports, per-mint over the wallet's life",
+            "type": "number"
+          },
+          "med_rp_all_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "med_sells_per_token": {
@@ -6458,8 +6243,22 @@
             },
             "type": "array"
           },
+          "pnl_distribution_usd": {
+            "description": "the buckets measured on the USD stamps",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
           "pnl_sparkline_7d": {
             "description": "lamports per day",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "pnl_sparkline_7d_usd": {
+            "description": "micro-USD per day",
             "items": {
               "type": "number"
             },
@@ -6531,95 +6330,10 @@
         },
         "type": "object"
       },
-      "internal_adapters_primary_http_handler.swapEventRow": {
-        "properties": {
-          "amount_in": {
-            "type": "number"
-          },
-          "amount_out": {
-            "type": "number"
-          },
-          "arb_pnl_lamports": {
-            "type": "integer"
-          },
-          "base_decimals": {
-            "type": "integer"
-          },
-          "dex": {
-            "type": "string"
-          },
-          "fee": {
-            "type": "integer"
-          },
-          "is_arb": {
-            "type": "boolean"
-          },
-          "is_buy": {
-            "type": "boolean"
-          },
-          "label": {
-            "type": "string"
-          },
-          "label_type": {
-            "type": "string"
-          },
-          "mint": {
-            "type": "string"
-          },
-          "pool": {
-            "type": "string"
-          },
-          "priority_fee_lamports": {
-            "type": "integer"
-          },
-          "quote_lamports": {
-            "type": "integer"
-          },
-          "quote_mint": {
-            "type": "string"
-          },
-          "realized_profit": {
-            "type": "integer"
-          },
-          "signature": {
-            "type": "string"
-          },
-          "slot": {
-            "type": "integer"
-          },
-          "sold_more_than_bought": {
-            "type": "boolean"
-          },
-          "sold_without_buy": {
-            "type": "boolean"
-          },
-          "tip_lamports": {
-            "type": "integer"
-          },
-          "tip_service": {
-            "type": "string"
-          },
-          "trader": {
-            "type": "string"
-          },
-          "ts": {
-            "type": "integer"
-          },
-          "virtual_sol": {
-            "description": "null — not in Pulsight SwapRow",
-            "type": "integer"
-          },
-          "virtual_token": {
-            "description": "null — not in Pulsight SwapRow",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
       "internal_adapters_primary_http_handler.tokensRow": {
         "properties": {
           "arb_tx_count": {
-            "description": "Distinct is_arb transactions on this (trader, mint). Shown alongside\nbuy/sell, never subtracted from them -- an arb still emits a buy row,\na sell row or both. It exists because those counts otherwise read as\nbroken on arbitrage wallets: a multi-hop arb bridging through a\nnon-quote token has its target buy leg quoted in that token, which is\nnot a registry quote, so only the quote-anchored sell reaches `swaps`.\n0 on the legacy Pnl path, which has no arb data -- the frontend hides\nthe segment at 0.",
+            "description": "The position's arbitrage-flagged trade rows. Shown alongside buy/sell,\nnever subtracted from them: an arbitrage buy or sell is also counted\nthere. The frontend hides the segment at 0.",
             "type": "integer"
           },
           "buy_tx_count": {
@@ -6628,8 +6342,12 @@
           "cost_basis_lamports": {
             "type": "string"
           },
+          "cost_basis_usd": {
+            "description": "micro-USD, stamped at execution",
+            "type": "string"
+          },
           "directional_buy_tx_count": {
-            "description": "Disjoint from ArbTxCount: these EXCLUDE arbitrage rows, so the UI shows\ndirectional buys / directional sells / arb txs without the three\noverlapping. 0 on the legacy Pnl path.",
+            "description": "The same position counters as buy_tx_count / sell_tx_count.",
             "type": "integer"
           },
           "directional_sell_tx_count": {
@@ -6639,6 +6357,10 @@
             "type": "string"
           },
           "holding_pnl_lamports": {
+            "type": "number"
+          },
+          "holding_pnl_usd": {
+            "description": "micro-USD, the same exit marked in USD",
             "type": "number"
           },
           "last_active_ts": {
@@ -6663,10 +6385,14 @@
             "type": "string"
           },
           "pool_quote_reserves": {
-            "description": "Rug-aware effective quote reserves of the mint's pool (lamports) and the\nexitability tier derived from them server-side. Together they let the row\nexplain WHY a bag marks at ~0. null / \"\" mean unknown -- which is what\nthe legacy Pnl fallback path below always reports, since it has no pool\ndata; the frontend renders no badge rather than a false rug.",
+            "description": "Rug-aware effective quote reserves of the mint's pool (lamports) and the\nexitability tier derived from them server-side. Together they let the row\nexplain WHY a bag marks at ~0. null / \"\" mean unknown; the frontend\nrenders no badge rather than a false rug.",
             "type": "number"
           },
           "realized_profit": {
+            "type": "number"
+          },
+          "realized_profit_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "sell_tx_count": {
@@ -6678,7 +6404,15 @@
           "total_fees": {
             "type": "number"
           },
+          "total_fees_usd": {
+            "description": "micro-USD",
+            "type": "number"
+          },
           "total_invested": {
+            "type": "number"
+          },
+          "total_invested_usd": {
+            "description": "micro-USD",
             "type": "number"
           },
           "trader": {
@@ -6765,6 +6499,32 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.Arb": {
+        "properties": {
+          "funding": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "notional": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "pools": {
+            "type": "integer"
+          },
+          "priced": {
+            "type": "boolean"
+          },
+          "take_home": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.AuthorityStat": {
         "properties": {
           "freeze": {
@@ -6788,7 +6548,7 @@
       "pulsight_internal_core_domain_aggregator.BondingCurveState": {
         "properties": {
           "graduated": {
-            "description": "True iff mint_migrations carries any graduation row for this mint.",
+            "description": "True iff a graduation is on file for this mint.",
             "type": "boolean"
           },
           "graduation_target_dex": {
@@ -6804,11 +6564,11 @@
             "type": "number"
           },
           "virtual_sol_lamports": {
-            "description": "Most recent observed virtual_sol (= dex_swaps.quote_reserves)\nsnapshot on the launchpad dex, in lamports. 0 for pre-feature\ngraduations with no curve swap on file.",
+            "description": "Latest observed quote reserve of the launchpad curve, in lamports. 0\nfor a graduation with no curve trade on file.",
             "type": "integer"
           },
           "virtual_token": {
-            "description": "Most recent observed virtual_token (NUMERIC → decimal string for\nJSON safety). \"0\" when no curve swap is on file.",
+            "description": "Latest observed base reserve of the curve (decimal string for JSON\nsafety). \"0\" when no curve trade is on file.",
             "type": "string"
           }
         },
@@ -6884,6 +6644,10 @@
           "total": {
             "type": "integer"
           },
+          "unit": {
+            "description": "Unit is the currency the page was ranked and filtered in (sol|usd);\nevery row carries both.",
+            "type": "string"
+          },
           "window": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Window"
           }
@@ -6896,6 +6660,9 @@
             "description": "CashbackVolumeLamports over TotalVolumeLamports is VolumeShare — nil\nwhen the window moved no volume (no share, which is not a 0% share).",
             "type": "integer"
           },
+          "cashback_volume_usd": {
+            "type": "integer"
+          },
           "censored": {
             "type": "boolean"
           },
@@ -6903,11 +6670,18 @@
             "type": "integer"
           },
           "claimed_lamports": {
-            "description": "ClaimedLamports / ClaimCount are nil only before CA 000106 exists. On\nthe lifetime window they are RETENTION-BOUNDED (the raw claim ledger\ncarries a 75-day TTL) — they undercount once rows age out rather than\ninventing, the trader panel's lifetime_claimed precedent.",
+            "description": "ClaimedLamports / ClaimCount — the cashback the wallet kept from its\nclaims in the window, and how many claims.",
+            "type": "integer"
+          },
+          "claimed_usd": {
             "type": "integer"
           },
           "earned_lamports": {
-            "description": "EarnedLamports — cashback accrued in the window TO THIS WALLET'S OWN\naccumulator (since classifier 0cb3f9c, executor-routed fills whose\naccumulator belongs to the filler are excluded); the board's primary\nmeasure (claiming is sporadic, earning is the smooth signal).",
+            "description": "EarnedLamports — cashback accrued in the window TO THIS WALLET'S OWN\naccumulator (executor-routed fills whose accumulator belongs to the\nfiller are excluded).",
+            "type": "integer"
+          },
+          "earned_usd": {
+            "description": "The Usd twins are the same families on the row's USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "first_seen_ms": {
@@ -6917,7 +6691,10 @@
             "type": "integer"
           },
           "holder_rewards_lamports": {
-            "description": "HolderRewardsLamports / HolderRewardPayouts — what pump PAID this wallet\nin holder rewards in the window (CA 000221), in priced lamports, and the\nnumber of payouts behind it. Holder rewards are pushed, not claimed, so\nthis one figure is already a receipt. RewardsTotalLamports is the board's\ndefault rank: cashback CLAIMED plus holder rewards RECEIVED, both cash\nbasis — never cashback earned, which is an accrual of the same money.",
+            "description": "HolderRewardsLamports / HolderRewardPayouts — what pump PAID this wallet\nin holder rewards in the window, in priced lamports, and the\nnumber of payouts behind it. Holder rewards are pushed, not claimed, so\nthis one figure is already a receipt. RewardsTotalLamports is the board's\ndefault rank: cashback CLAIMED plus holder rewards RECEIVED, both cash\nbasis — never cashback earned, which is an accrual of the same money.",
+            "type": "integer"
+          },
+          "holder_rewards_usd": {
             "type": "integer"
           },
           "last_active_ms": {
@@ -6937,6 +6714,9 @@
           "rewards_total_lamports": {
             "type": "integer"
           },
+          "rewards_total_usd": {
+            "type": "integer"
+          },
           "tags": {
             "description": "Tags are the derived classification tags (`deriveTags`), resolved for\nthe whole page in one round trip so a row states what the wallet is\nwithout being expanded. Empty on a censored row, and nil when the\nenrichment query failed — best-effort by contract, never an error the\nboard surfaces.",
             "items": {
@@ -6945,6 +6725,9 @@
             "type": "array"
           },
           "total_volume_lamports": {
+            "type": "integer"
+          },
+          "total_volume_usd": {
             "type": "integer"
           },
           "trader": {
@@ -6963,10 +6746,17 @@
             "type": "integer"
           },
           "claimed_lamports": {
-            "description": "ClaimedLamports / ClaimCount: on the lifetime window these are\nRETENTION-BOUNDED sums over the 75-day claim ledger (undercount, never\ninvented).",
+            "description": "ClaimedLamports / ClaimCount: the population's kept claims and their\ncount.",
+            "type": "integer"
+          },
+          "claimed_usd": {
             "type": "integer"
           },
           "earned_lamports": {
+            "type": "integer"
+          },
+          "earned_usd": {
+            "description": "The Usd twins are the same population figures on the USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "earners": {
@@ -6980,14 +6770,26 @@
             "description": "HolderRewardsLamports / HolderRewardPayouts / RewardsTotalLamports —\nthe same population's holder-reward side and the merged cash-basis\ntotal the board ranks on by default.",
             "type": "integer"
           },
+          "holder_rewards_usd": {
+            "type": "integer"
+          },
           "median_earned_lamports": {
             "description": "Population marks.",
+            "type": "integer"
+          },
+          "median_earned_usd": {
             "type": "integer"
           },
           "rank1_earned_lamports": {
             "type": "integer"
           },
+          "rank1_earned_usd": {
+            "type": "integer"
+          },
           "rewards_total_lamports": {
+            "type": "integer"
+          },
+          "rewards_total_usd": {
             "type": "integer"
           },
           "window": {
@@ -6999,14 +6801,18 @@
       "pulsight_internal_core_domain_aggregator.CashbackClaimRow": {
         "properties": {
           "amount": {
-            "description": "Amount is the raw payout in QuoteMint's base units, and Priced says\nwhether AmountLamports carries a SOL valuation of it. Both are zero on\na claim, whose AmountLamports is already lamports.",
+            "description": "Amount is the event's raw amount in QuoteMint's base units — a claim's\nKEPT amount, a payout's receipt — and Priced says whether\nAmountLamports carries a SOL valuation of it.",
             "type": "integer"
           },
           "amount_gross": {
-            "description": "AmountGross is a cashback claim's RAW swept amount before the part the\nwallet immediately re-parked; AmountLamports is what it KEPT. They differ\non a park-resweep, where kept is legitimately zero and only the gross\nshows a claim happened at all. Zero on a payout, which cannot be parked.",
+            "description": "AmountGross is a cashback claim's RAW swept amount before the part the\nwallet immediately re-parked; Amount is what it KEPT. They differ on a\npark-resweep, where kept is legitimately zero and only the gross shows\na claim happened at all. Zero on a payout, which cannot be parked.",
             "type": "integer"
           },
           "amount_lamports": {
+            "type": "integer"
+          },
+          "amount_usd": {
+            "description": "AmountUsd is the event's value on its USD stamp (micro-USD).",
             "type": "integer"
           },
           "kind": {
@@ -7024,7 +6830,7 @@
             "type": "string"
           },
           "price_basis": {
-            "description": "PriceBasis says HOW AmountLamports was arrived at: \"exact\" when the\npayout was already in SOL, \"market\" when it was valued through the\nquote's own SOL market at that minute, \"unpriced\" when no value could\nbe stated. A market figure moves with the quote; an exact one is the\namount received. Empty on a cashback claim.",
+            "description": "PriceBasis says HOW AmountLamports was arrived at: \"money\" when the\nevent was paid in WSOL or a USD stablecoin, \"pool\" when it was valued\nthrough the quote's own market at execution, \"unpriced\" when no SOL\nvalue could be stated.",
             "type": "string"
           },
           "priced": {
@@ -7126,13 +6932,51 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.Costs": {
+        "properties": {
+          "base_fee": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "cashback_on_top": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "dex_fee": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "payer": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "platform_fee": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "priority_fee": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "rent_paid": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "rent_refunded": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "tip": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "tip_service": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.CreatedMintRow": {
         "properties": {
           "decimals": {
             "type": "integer"
           },
           "first_seen_ts": {
-            "description": "FirstSeenTS proxies \"created at\" — the create-tx and first buy land in\nthe same flush window. nil for fixture-only edge cases.",
+            "description": "FirstSeenTS proxies \"created at\" — the mint's first trade. nil when no\ntrade is on file.",
             "type": "string"
           },
           "graduated": {
@@ -7161,7 +7005,7 @@
       "pulsight_internal_core_domain_aggregator.DevHoldings": {
         "properties": {
           "balance_raw": {
-            "description": "Creator's raw token balance (NUMERIC → decimal string).",
+            "description": "Creator's raw token balance (decimal string).",
             "type": "string"
           },
           "creator": {
@@ -7271,6 +7115,26 @@
           "pct_of_supply": {
             "description": "% of circulating, 0..100",
             "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.Hop": {
+        "properties": {
+          "dex": {
+            "type": "string"
+          },
+          "mint_in_id": {
+            "type": "integer"
+          },
+          "mint_out_id": {
+            "type": "integer"
+          },
+          "pool": {
+            "type": "string"
+          },
+          "pool_id": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -7457,7 +7321,7 @@
             "type": "number"
           },
           "fee_trap_buckets": {
-            "description": "FeeTrapBuckets/FeeSellBuyRatio back \"fee_trap\" (confiscatory sell\ntax, CA 000133/r59): distinct 15-minute buckets in the last 7 days\nwhose sells executed below half that bucket's buy VWAP, and the\nwindow's overall sell/buy exec-price ratio (display only).",
+            "description": "FeeTrapBuckets/FeeSellBuyRatio back \"fee_trap\" (confiscatory sell\ntax): distinct 15-minute buckets in the last 7 days\nwhose sells executed below half that bucket's buy VWAP, and the\nwindow's overall sell/buy exec-price ratio (display only).",
             "type": "integer"
           },
           "freeze_count": {
@@ -7480,7 +7344,7 @@
             "type": "integer"
           },
           "transfer_fee_bps": {
-            "description": "TransferFeeBps backs \"transfer_fee\" (Token-2022, CA 000134/r61): the\non-chain transfer fee in basis points (max of the current and\nscheduled fee).",
+            "description": "TransferFeeBps backs \"transfer_fee\" (Token-2022): the on-chain transfer\nfee in basis points (max of the current and scheduled fee).",
             "type": "integer"
           }
         },
@@ -7513,15 +7377,15 @@
             "type": "string"
           },
           "price_basis_pool": {
-            "description": "PriceBasisPool is the pool PriceUsd was read from: the mint's DOMINANT\npool by 24h quote volume, which is the basis the whole price surface\nuses so a dust side-market's prints cannot move the displayed number.\nA client that patches the price from the live swap stream between reads\nmust believe prints from THIS pool only — and gets the answer from the\nserver precisely so it never has to resolve a dominant pool of its own.\nnil whenever PriceUsd is.",
+            "description": "PriceBasisPool is the pool PriceUsd was read from: the mint's reference\npool, which is the basis the whole price surface uses so a dust\nside-market's prints cannot move the displayed number.\nA client that patches the price from the live swap stream between reads\nmust believe prints from THIS pool only — and gets the answer from the\nserver precisely so it never has to resolve a dominant pool of its own.\nnil whenever PriceUsd is.",
             "type": "string"
           },
           "price_usd": {
-            "description": "PriceUsd / MarketCapUsd carry MintRow.PriceUsd and MintRow.MarketCapUsd\nverbatim, including their nil conditions (no WSOL pool, unknown\ndecimals, no SOL/USD reference, absent supply).",
+            "description": "PriceUsd / MarketCapUsd carry MintRow.PriceUsd and MintRow.MarketCapUsd\nverbatim, including their nil conditions (no priced reference pool,\nunknown decimals, absent supply).",
             "type": "number"
           },
           "unique_traders": {
-            "description": "UniqueTraders is MintRow.UniqueTraders read straight off the insert-time\nuniq plane, so it is as fresh as ingest rather than as fresh as the\nholder-fold refresh that stamps the identity row. nil without the plane:\nthis route never falls back to the lifetime position-table fold, which is\nthe read it exists to stop paying at poll cadence. A quote-registry mint\nhas no rows on that plane and so never reports a count here.",
+            "description": "UniqueTraders is read straight off the insert-time `mint_traders`\nplane, so it is as fresh as ingest. nil when the plane has no row: this\nroute never falls back to a lifetime fold over positions, which is the\nread it exists to stop paying at poll cadence. A quote-registry mint has\nno rows on that plane and so never reports a count here.",
             "type": "integer"
           }
         },
@@ -7529,11 +7393,18 @@
       },
       "pulsight_internal_core_domain_aggregator.MintMarket": {
         "properties": {
+          "base_mint": {
+            "description": "BaseMint is the pool's base side as the aggregator oriented it — the\npage's own mint except on a money mint's page, where the mint may be\nthe quote of the pools listed. BaseSymbol is its symbol, empty when\nunknown.",
+            "type": "string"
+          },
+          "base_symbol": {
+            "type": "string"
+          },
           "dex": {
             "type": "string"
           },
           "is_default": {
-            "description": "IsDefault marks the mint's default market — the pool an unpinned\n/api/ohlcv chart resolves to (lifetime-dominant, recency-aware; one\ndefinition, server-side: defaultMarketPool). Resolved independently\nof the requested window, so a listing may carry no flagged row when\nthe default market is idle (short windows) or older than swap\nretention. Resolve defaults from `window=all`.",
+            "description": "IsDefault marks the mint's default market — the pool an unpinned\n/api/ohlcv chart resolves to (lifetime-dominant, recency-aware; one\ndefinition, server-side: defaultMarketPool). Resolved independently\nof the requested window, so a listing may carry no flagged row when\nthe default market is idle in a short window. Resolve defaults from\n`window=all`.",
             "type": "boolean"
           },
           "last_swap_ts": {
@@ -7542,8 +7413,15 @@
           "pool": {
             "type": "string"
           },
+          "quote_decimals": {
+            "type": "integer"
+          },
           "quote_mint": {
-            "description": "QuoteMint is the pool's quote side under CA's registry ranking (USDC >\nUSDT > USD1 > WSOL), so a SOL/USDC pool quotes in USDC. This market's\ncandle prices and quote volumes are denominated in it, and the live\nchart folds only ticks that carry the same quote.",
+            "description": "QuoteMint is the pool's quote side as the aggregator oriented it: a\nregistry quote when one side is one (USDC > USDT > USD1 > WSOL), else\nthe pool's own quote token. This market's native candle prices and\nquote amounts are denominated in it, and the live chart folds only\nticks that carry the same quote.",
+            "type": "string"
+          },
+          "quote_symbol": {
+            "description": "QuoteSymbol and QuoteDecimals describe the quote mint; the decimals are\nomitted when the mint is unknown.",
             "type": "string"
           },
           "sol_volume_lamports": {
@@ -7573,11 +7451,11 @@
             "type": "integer"
           },
           "source": {
-            "description": "Source ∈ {\"observed\",\"inferred\"} (CHECK constraint).",
+            "description": "Source ∈ {\"observed\",\"inferred\"}.",
             "type": "string"
           },
           "source_pool": {
-            "description": "SourcePool is the bonding-curve pool the mint traded on BEFORE\ngraduating. Together with DestinationPool it is the mint's market\nlineage — the pools /api/ohlcv merges into one continuous chart when\nno pool is pinned. Empty when unknown (rows predating\ncarbon-aggregator CH migration 000073, or a venue whose migration ix\ndoesn't expose the curve); treat '' as \"no pre-graduation side\".",
+            "description": "SourcePool is the bonding-curve pool the mint traded on BEFORE\ngraduating. Together with DestinationPool it is the mint's market\nlineage — the pools /api/ohlcv merges into one continuous chart when\nno pool is pinned. Empty when unknown (a venue whose migration\ninstruction doesn't expose the curve); treat '' as \"no pre-graduation\nside\".",
             "type": "string"
           },
           "timestamp": {
@@ -7600,7 +7478,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.BondingCurveState"
               }
             ],
-            "description": "── CA mint-catalog enrichment (ported from mint_catalog.rs::find /\nlist_active). bonding_curve + dev_holdings + supply populate on BOTH\n/api/mints (list) and /api/mints/:pubkey (detail); authorities\npopulate on the detail path only (nil on list rows). All pointer +\nomitempty so list rows stay lean. The frontend's CurveBadge/DevPill\nalready render bonding_curve/dev_holdings."
+            "description": "bonding_curve, dev_holdings, supply and the authorities populate on\nBOTH /api/mints (list) and /api/mints/:pubkey (detail); metadata_uri\nand fetch_status are detail-only. All pointer + omitempty so list rows\nstay lean."
           },
           "bundled": {
             "allOf": [
@@ -7608,10 +7486,9 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintBundled"
               }
             ],
-            "description": "Bundled/Insiders are the audit-cell cohort flags (best-effort list\ndecoration; absent when not notable). Bundled = a same-slot launch buy\ncluster (swap-derived); Insiders = the creator distributed supply via\nlaunch-window SPL transfers (needs token-program capture). Both are\nat-a-glance proxies for the per-mint risk card's full cohorts."
+            "description": "Bundled/Insiders are the audit-cell cohort flags (absent when not\nnotable). Bundled = the sealed launch bundle cohort; Insiders = the\ncreator distributed supply via launch-window SPL transfers. Both are\nat-a-glance views of the per-mint risk card's cohorts."
           },
           "buy_count": {
-            "description": "BuyCount/SellCount: buy- vs sell-side swap counts over the `?hours`\nactivity window (countIf(is_buy)). Populated on the list path; 0 on\nthe detail path.",
             "type": "integer"
           },
           "creator": {
@@ -7633,7 +7510,7 @@
             "type": "string"
           },
           "holder_count": {
-            "description": "── GMGN-style discovery enrichment (list path only, best-effort). ──\nHolderCount is the number of distinct wallets currently holding a\npositive balance of this mint (uniqExact over trader_token_stats).\nnil when the holders batch is unavailable. Best-effort: a holders\nhiccup decorates fewer rows, it never fails the listing.",
+            "description": "HolderCount is the number of wallets holding a positive balance of\nthis mint, off the sealed holder-stats family of the mint's row (pool\ninventory excluded by token account); nil until the family is sealed.",
             "type": "integer"
           },
           "honeypot": {
@@ -7642,13 +7519,13 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintHoneypot"
               }
             ],
-            "description": "Honeypot flags a likely sell-blocking token. Best-effort decoration;\nabsent when no reason fires. Step 1 populates the \"freezes_holders\"\nreason from mint_safety_events (froze many holder accounts, thawed\nfew). Future Token-2022 reasons (transfer_fee/hook/…) accrete here.\nThe \"impersonating\" reason (verified ticker reused by a different\nmint) also rides here — badge-only, no filter arm."
+            "description": "Honeypot flags a likely sell-blocking token; absent when no reason\nfires. The \"impersonating\" reason (verified ticker reused by a different\nmint) also rides here — badge-only, no filter arm."
           },
           "insiders": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintInsiders"
           },
           "is_mayhem_mode": {
-            "description": "IsMayhemMode flags a Pump.fun \"Mayhem\"-mode token (its trades route\nthrough the Mayhem custody program). Populated on BOTH list and detail\nfrom the mint_mayhem table; omitted when false.",
+            "description": "IsMayhemMode flags a Pump.fun \"Mayhem\"-mode token (its trades route\nthrough the Mayhem custody program). Populated on BOTH list and detail;\nomitted when false.",
             "type": "boolean"
           },
           "last_trade_ts": {
@@ -7658,11 +7535,11 @@
             "type": "string"
           },
           "lp_burned": {
-            "description": "LpBurned reports whether ANY LP burn is on file for the mint — the same\n`lp_events(op='burn')` set the `lp_burned=1` listing filter uses, so the\naudit glyph and the filter can never disagree. Page-scoped, so it is a\ndefinite true/false for every returned row (never nil on the list path);\nnil on the detail path, where the batch does not run.",
+            "description": "LpBurned reports whether ANY LP burn is on file for the mint — the same\nflag the `lp_burned=1` listing filter uses, so the audit glyph and the\nfilter can never disagree.",
             "type": "boolean"
           },
           "market_cap_usd": {
-            "description": "MarketCapUsd is PriceUsd × circulating supply. Equivalently\nclose_sol × supply_raw × sol_usd / 1e6 (token decimals cancel), so\nit's populated even when decimals are unknown (unlike PriceUsd). nil\nwhen the WSOL close, supply, or SOL/USD ref is missing.",
+            "description": "MarketCapUsd is the stored latest price × supply, in USD; nil when\neither is unknown.",
             "type": "number"
           },
           "markets_count": {
@@ -7683,14 +7560,14 @@
             "type": "string"
           },
           "price_sparkline": {
-            "description": "PriceSparkline is the mint's last-24h price shape: WSOL-quoted per-minute\ncloses of the mint's DOMINANT pool (highest 24h quote volume — one pool,\nnever a merge, so a dust side-market's prints can't flatten the line),\noldest→newest, at most priceSparklineMaxPoints values. A mint that\ntraded through the whole window is sampled evenly down to that cap\n(so the series still spans 24h, just coarser); one that traded for an\nhour carries all of it. It rides the SAME scan as PriceUsd, so it\ncarries the same denomination caveat: WSOL-quoted only, which is why a\nUSDC-only mint has none rather than a series in another unit (mixing\nquotes would draw a step that never happened). Values are raw SOL per\nwhole token, rounded to 6 significant digits — the client normalises to\nits own min/max, so the unit only has to be CONSISTENT within the\nseries, and this is a SHAPE, not a price read (use PriceUsd for that).\nOnly minutes that actually traded appear, so the x axis is trade\nsequence, not wall clock. Omitted below 2 points — but a mint younger\nthan ~10 minutes gets its points from 1-SECOND candles instead, so a\nfresh row draws a line as soon as it has two seconds of trading.",
+            "description": "PriceSparkline is the mint's last-24h price shape: the USD closes of\nits dominant pool at 15-minute buckets, oldest→newest, at most\npriceSparklineMaxPoints values rounded to 6 significant digits. Only\nbuckets that traded appear. It is a SHAPE (the client normalises to\nits own min/max), not a price read. Omitted below 2 points.",
             "items": {
               "type": "number"
             },
             "type": "array"
           },
           "price_usd": {
-            "description": "PriceUsd is the latest price per WHOLE token in USD, derived from the\ndominant WSOL-quoted OHLCV close × the SOL/USD reference rate. nil\nwhen there's no WSOL pool, decimals are unknown, or no SOL/USD ref.",
+            "description": "PriceUsd is the stored latest price per WHOLE token in USD (the\nreference pool's per-raw-unit stamp scaled by the mint's decimals);\nnil when the mint has no priced reference pool or unknown decimals.",
             "type": "number"
           },
           "risk_score": {
@@ -7709,33 +7586,37 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintStatsByWindow"
               }
             ],
-            "description": "Windowed stats bundle keyed by window. Reuses the same\nMintStatsByWindow struct that GET /api/mints/:pubkey/stats\nreturns so the frontend's ActiveMint.stats path consumes both\nendpoints identically.\n\n/api/mints/:pubkey/stats (FindStatsBundle) populates all four\nwindows in one round-trip.\n\n/api/mints (ListActive) currently populates ONLY the active\nwindow's bucket — the other three windows in the per-row\nMintStatsByWindow stay zero-valued. The frontend's\n`m.stats?.[window]?.…` chain renders `—` on null, so this is\nsafe; an N-row × 4-window fan-out would mean 3× more LATERAL\njoins per page and the UI only ever shows one window at a time\n(window switch refetches the page). If a future surface needs\nall four windows in the list response, extend ListActive to\nmatch FindStatsBundle's four-LATERAL pattern."
+            "description": "Windowed stats bundle keyed by window, the same MintStatsByWindow\nstruct GET /api/mints/:pubkey/stats returns. /api/mints (ListActive)\nfills the requested window and the short 1m/5m/1h windows; the other\nwindows stay zero-valued."
           },
           "supply": {
-            "description": "Supply is the on-chain total supply (NUMERIC → decimal string, raw\nsmallest units); nil until the enricher has decoded the mint account.\nPopulated on the list path to back the market-cap column.",
+            "description": "Supply is the on-chain total supply (decimal string, raw\nsmallest units); nil until the enricher has decoded the mint account.\nPopulated on the list path to back the market-cap column.",
             "type": "string"
           },
           "swap_count": {
-            "description": "Window-bound activity aggregates over the `?hours` lookback,\nderived from hourly_mint_trader_activity + hourly_mint_pool_activity.\nAll non-pointer because GROUP BY in the LATERAL produces a row even\nfor zero swaps (we go through the activity gate first, so anything\nreturned has at least one). SwapCount, TraderCount and MarketsCount\ndefault to 0 if the LATERAL came up empty; the frontend's `formatNum`\nrenders 0 cleanly.",
+            "description": "Activity counts. On the listing they count the `?hours` gate the page\nwas filtered on, off the board row's gate counters; on the detail page\nSwapCount, BuyCount and SellCount are lifetime and TraderCount is 0.\nMarketsCount is the number of pools the mint trades in.",
             "type": "integer"
           },
           "symbol": {
             "type": "string"
           },
           "top10_pct": {
-            "description": "Top10Pct is the top-10 holder concentration as a PERCENT of circulating\nsupply (0..100). Already read per page by top10ConcentrationBatch to\nscore the row — emitting it costs nothing extra and is what the listing's\nDistribution column leads with. nil when the accumulator has no row for\nthe mint (fresh token, or holder balances not yet folded).",
+            "description": "Top10Pct is the top-10 holder concentration as a PERCENT of circulating\nsupply (0..100), off the mint's holder-stats plane — the figure the\nlisting's Distribution column leads with. nil until the plane has\nfolded the mint's holders.",
             "type": "number"
           },
           "top_dex": {
-            "description": "TopDex is the venue slug of the mint's DOMINANT pool over the activity\nwindow — the pool with the most quote volume, i.e. the venue the token\nactually trades on. Same vocabulary as `?dex=` and `swaps.dex`; look up\nthe display label via DEX_LABEL. Rides fillMarketsCount's existing scan\n(same GROUP BY, one more aggregate), so it is free. nil when the mint had\nno dex_swaps row in the window.",
+            "description": "TopDex is the venue slug the token actually trades on: on the listing\nthe mint's dominant pool's venue, on the detail page its graduation\ntarget or else its launchpad. Same vocabulary as `?dex=`; look up the\ndisplay label via DEX_LABEL. nil when unknown.",
             "type": "string"
           },
           "total_fees_sol": {
-            "description": "TotalFeesSol — LIFETIME network fees paid trading the mint, in\nlamports: tx fees (base + priority) plus MEV tips summed over its\nswaps (CA 000137 on mint_activity_totals; the 000064 sawtooth basis —\nlifetime between stats rebuilds, re-synced to the swaps 3-month\nretention at each healer finalize). Unlike the counts above it is NOT\nhours-window-bound. nil until the migration is applied or when the\npage decoration read fails.",
+            "description": "TotalFeesSol — LIFETIME network fees paid trading the mint, in\nlamports: tx fees (base + priority) plus MEV tips over its trades.\nUnlike the listing's counts above it is NOT hours-window-bound. nil\nwhen the mint has no trades on file.",
+            "type": "integer"
+          },
+          "total_fees_usd": {
+            "description": "TotalFeesUsd is the same figure on the USD stamps (micro-USD).",
             "type": "integer"
           },
           "total_tx_count": {
-            "description": "TotalTxCount — LIFETIME swap count for the mint, from the same\nmint_activity_totals seek as TotalFeesSol (and on its same sawtooth\nbasis). It is the fee figure's denominator: the bot-fee-pattern risk\nrule scores fees PER transaction, so the two must share a basis —\nthe hours-window SwapCount would not. nil whenever TotalFeesSol is.",
+            "description": "TotalTxCount — LIFETIME trade count for the mint, on the same basis as\nTotalFeesSol. It is the fee figure's denominator: the bot-fee-pattern\nrisk rule scores fees PER transaction, so the two must share a basis —\nthe hours-window SwapCount would not. nil whenever TotalFeesSol is.",
             "type": "integer"
           },
           "trader_count": {
@@ -7747,10 +7628,10 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintTraderQuality"
               }
             ],
-            "description": "TraderQuality is the per-mint wallet-class fold (CA 000131) behind the\nORGANIC distribution slot, the low_organic_activity risk rule and\nsort=organic. Best-effort list decoration; nil before the migration or\nwhen the batch read fails."
+            "description": "TraderQuality is the per-mint wallet-class fold behind the ORGANIC\ndistribution slot, the low_organic_activity risk rule and sort=organic;\nnil until the fold covers the mint."
           },
           "unique_traders": {
-            "description": "UniqueTraders is the number of distinct wallets that have EVER traded\nthis mint, folded from the insert-time uniq plane (`mint_trader_uniq`)\nthat accumulates one `uniq` state per mint off `swaps`. Distinct from\nTraderCount (a WINDOWED count over the `?hours` gate, list path only):\nUniqueTraders is LIFETIME, so the list column and the\n/api/mints/:pubkey detail render the same value. Exact below ~10k\ndistinct wallets and HLL-approximate above — a trader set only ever\ngrows, which is what lets it be an accumulator at all (a holder set does\nnot, and HolderCount keeps its fold). Populated on BOTH paths,\nbest-effort: nil when the read is unavailable. A quote-registry mint\n(WSOL, the USD stables) never appears as `swaps.mint`, so its detail\ncounts the distinct wallets of its last 30 days of per-leg dex_swaps\ninstead.",
+            "description": "UniqueTraders is the LIFETIME number of distinct wallets that traded\nthis mint (the insert-time `mint_traders` plane on the detail path, the\nholder-stats traders on the list path), as opposed to TraderCount, the\ncount over the `?hours` gate; nil when unavailable.",
             "type": "integer"
           },
           "verified": {
@@ -7809,10 +7690,7 @@
       "pulsight_internal_core_domain_aggregator.MintTraderRow": {
         "properties": {
           "arb_tx_count": {
-            "description": "Distinct is_arb transactions for this (trader, mint). Same rationale\nas TraderTokenPosition.ArbTxCount: shown alongside buy/sell, never\nsubtracted, so lopsided counts on arbitrage wallets are legible.",
-            "type": "integer"
-          },
-          "bundle_slot": {
+            "description": "ArbTxCount is the position's arbitrage-flagged trade rows, as on\nTraderTokenPosition.ArbTxCount: shown alongside buy/sell, never\nsubtracted.",
             "type": "integer"
           },
           "buy_tx_count": {
@@ -7821,8 +7699,12 @@
           "cost_basis_lamports": {
             "type": "string"
           },
+          "cost_basis_usd": {
+            "description": "The Usd twins are the position's figures on its trades' USD stamps\n(micro-USD); HoldingPnlUsd is the same realizable exit marked in USD.",
+            "type": "string"
+          },
           "directional_buy_tx_count": {
-            "description": "Directional counts EXCLUDE arbitrage rows, so the three numbers the UI\nshows are disjoint: directional buys / directional sells / arb txs.\nOverlapping them is what made an arb wallet read \"11 buys / 2 sells /\n11 arb\" -- every one of those buys WAS one of the arbs. A pure\narbitrageur now reads 0 / 0 / N, which is the truth: it never took a\ndirectional position in the token.\n\nbuy_tx_count / sell_tx_count keep their original meaning (all rows,\nmatching the trader_token_stats rollup that the leaderboard and its\n`f=` filters read) so nothing downstream shifts under them.",
+            "description": "DirectionalBuyTxCount / DirectionalSellTxCount carry the same position\ncounters as buy_tx_count / sell_tx_count.",
             "type": "integer"
           },
           "directional_sell_tx_count": {
@@ -7834,8 +7716,11 @@
           "holding_pnl_lamports": {
             "type": "integer"
           },
+          "holding_pnl_usd": {
+            "type": "integer"
+          },
           "initial_pct_of_supply": {
-            "description": "InitialPctOfSupply is a bundler's net launch acquisition as % of total\nsupply, and BundleSlot the first bundle slot it bought in. Both are set\nonly on the bundlers path.",
+            "description": "InitialPctOfSupply is a bundler's net launch acquisition as % of total\nsupply, set only on the bundlers path.",
             "type": "number"
           },
           "is_bundler": {
@@ -7858,10 +7743,13 @@
             "type": "string"
           },
           "pct_of_supply": {
-            "description": "PctOfSupply is the holder's % of circulating supply, set on the\ntop-holders and cohort paths (sourced from on-chain holder_balances).\nnil on the top-traders path. IsSniper/IsBundler/IsInsider flag cohort\nmembership on every per-mint trader list.",
+            "description": "PctOfSupply is the holder's % of circulating supply, set on the\ntop-holders and cohort paths (from the on-chain `holder_accounts`).\nnil on the top-traders path. IsSniper/IsBundler/IsInsider flag cohort\nmembership on every per-mint trader list.",
             "type": "number"
           },
           "realized_profit": {
+            "type": "integer"
+          },
+          "realized_profit_usd": {
             "type": "integer"
           },
           "sell_tx_count": {
@@ -7873,7 +7761,13 @@
           "total_fees": {
             "type": "integer"
           },
+          "total_fees_usd": {
+            "type": "integer"
+          },
           "total_invested": {
+            "type": "integer"
+          },
+          "total_invested_usd": {
             "type": "integer"
           },
           "trader": {
@@ -7891,12 +7785,21 @@
             "description": "SOL spent buying, in lamports.",
             "type": "integer"
           },
+          "buy_volume_usd": {
+            "type": "integer"
+          },
           "net_buy_sol": {
             "description": "buy_volume_sol - sell_volume_sol, in lamports.",
             "type": "integer"
           },
+          "net_buy_usd": {
+            "type": "integer"
+          },
           "pool_sol": {
-            "description": "Most recent virtual_sol (pool size) observed in the window, in lamports.",
+            "description": "The reference pool's latest quote-side depth, in lamports.",
+            "type": "integer"
+          },
+          "pool_usd": {
             "type": "integer"
           },
           "price_change_pct": {
@@ -7910,15 +7813,25 @@
             "description": "SOL received from sells, in lamports.",
             "type": "integer"
           },
+          "sell_volume_usd": {
+            "type": "integer"
+          },
           "swap_count": {
             "type": "integer"
           },
           "total_fees_sol": {
-            "description": "Total network fees paid trading the mint in the window, in lamports:\ntx fees (base + priority) plus MEV tips, summed over its swaps.\nPopulated by the per-mint stats endpoint only; the listing endpoint\n(/api/mints) leaves it nil (the OHLCV planes carry no fee data).",
+            "description": "Total network fees paid trading the mint in the window, in lamports:\ntx fees (base + priority) plus MEV tips over its trades.",
+            "type": "integer"
+          },
+          "total_fees_usd": {
             "type": "integer"
           },
           "volume_sol": {
             "description": "Total SOL traded (buy + sell), in lamports.",
+            "type": "integer"
+          },
+          "volume_usd": {
+            "description": "The Usd twins are the same figures on the trades' USD stamps\n(micro-USD), never lamports converted by a later rate.",
             "type": "integer"
           }
         },
@@ -7936,11 +7849,26 @@
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintStatsByWindow"
           },
           "total_fees_lifetime_sol": {
-            "description": "TotalFeesLifetimeSol — LIFETIME network fees paid trading the mint,\nin lamports (same basis and plane as MintRow.TotalFeesSol on the\nlisting: CA 000137's `fees` on mint_activity_totals, NOT bound to any\nwindow). Feeds the token detail page's header bar. nil until the\nmigration is applied or when the best-effort read fails.",
+            "description": "TotalFeesLifetimeSol — LIFETIME network fees paid trading the mint,\nin lamports (`mint_activity_totals`, NOT bound to any window). Feeds\nthe token detail page's header bar. nil when the best-effort read\nfails.",
+            "type": "integer"
+          },
+          "total_fees_lifetime_usd": {
+            "description": "TotalFeesLifetimeUsd is the same figure on the USD stamps (micro-USD).",
             "type": "integer"
           },
           "total_tx_count_lifetime": {
-            "description": "TotalTxCountLifetime — LIFETIME swap count for the mint, from the same\nmint_activity_totals seek as TotalFeesLifetimeSol and on its same basis.\nIt is the denominator a windowless token-metric gate reads, and pairing\nthe two keeps a per-transaction fee figure on one basis. nil whenever\nTotalFeesLifetimeSol is.",
+            "description": "TotalTxCountLifetime — LIFETIME trade count for the mint, from the same\n`mint_activity_totals` read as TotalFeesLifetimeSol.\nIt is the denominator a windowless token-metric gate reads, and pairing\nthe two keeps a per-transaction fee figure on one basis. nil whenever\nTotalFeesLifetimeSol is.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.Money": {
+        "properties": {
+          "sol": {
+            "type": "integer"
+          },
+          "usd": {
             "type": "integer"
           }
         },
@@ -8501,6 +8429,143 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.Trade": {
+        "properties": {
+          "arb": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Arb"
+          },
+          "attribution": {
+            "type": "string"
+          },
+          "carry_basis": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "carry_from_mint": {
+            "type": "string"
+          },
+          "carry_from_mint_id": {
+            "type": "integer"
+          },
+          "carry_to_mint": {
+            "type": "string"
+          },
+          "carry_to_mint_id": {
+            "type": "integer"
+          },
+          "cashback_accrued": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "costs": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Costs"
+          },
+          "counter_amount": {
+            "type": "integer"
+          },
+          "counter_decimals": {
+            "type": "integer"
+          },
+          "counter_mint": {
+            "type": "string"
+          },
+          "counter_mint_id": {
+            "type": "integer"
+          },
+          "counter_symbol": {
+            "type": "string"
+          },
+          "decimals": {
+            "type": "integer"
+          },
+          "dex": {
+            "type": "string"
+          },
+          "fees": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "flags": {
+            "type": "integer"
+          },
+          "is_arb": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "label_type": {
+            "type": "string"
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "mint_id": {
+            "type": "integer"
+          },
+          "price_age_ms": {
+            "type": "integer"
+          },
+          "price_source": {
+            "type": "string"
+          },
+          "primary_pool": {
+            "type": "string"
+          },
+          "primary_pool_id": {
+            "type": "integer"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "realized": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "route": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Hop"
+            },
+            "type": "array"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "integer"
+          },
+          "sol_post_lamports": {
+            "type": "integer"
+          },
+          "sol_usd": {
+            "type": "number"
+          },
+          "trader": {
+            "type": "string"
+          },
+          "ts_ms": {
+            "type": "integer"
+          },
+          "tx_index": {
+            "type": "integer"
+          },
+          "v_source": {
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+          },
+          "wsol_post_lamports": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.TraderBehavioralStats": {
         "properties": {
           "active_hours_count": {
@@ -8519,11 +8584,17 @@
             "description": "Avg/MedianRealizedProfitLamports are the window's realized profit per\nTOKEN — one figure per mint the wallet actually sold, then averaged and\nmedianed across them. Mints with no sell in the window are excluded\nrather than counted as zero: an unclosed position has no realized\noutcome, and zeros would drag the median toward it. The pair is the\nper-window twin of the leaderboard's Avg RP / Med RP columns.",
             "type": "number"
           },
+          "avg_realized_profit_usd": {
+            "type": "number"
+          },
           "avg_sell_count_per_token": {
             "type": "number"
           },
           "avg_trade_size_lamports": {
             "description": "AvgTradeSizeLamports is TotalVolumeLamports over the window's swap\ncount — the wallet's typical clip. It is what makes the price-impact\nfigures legible: impact is size against pool depth, so the two are\nread together.",
+            "type": "number"
+          },
+          "avg_trade_size_usd": {
             "type": "number"
           },
           "median_buy_count_per_token": {
@@ -8538,6 +8609,9 @@
           "median_realized_profit_lamports": {
             "type": "number"
           },
+          "median_realized_profit_usd": {
+            "type": "number"
+          },
           "median_sell_count_per_token": {
             "type": "number"
           },
@@ -8547,6 +8621,9 @@
           "profit_per_trade_lamports": {
             "type": "number"
           },
+          "profit_per_trade_usd": {
+            "type": "number"
+          },
           "pubkey": {
             "type": "string"
           },
@@ -8554,7 +8631,11 @@
             "type": "number"
           },
           "total_volume_lamports": {
-            "description": "TotalVolumeLamports is the window's traded value, both sides, read as\nthe QUOTE side of each row — see the adapter's swapQuoteSideExpr for\nwhy a plain `sum(amount_in)` is not that, and for the one case it is\nstill approximate (non-WSOL quotes count in their own units).",
+            "description": "TotalVolumeLamports is the window's traded value, buys and sells,\nstamped in SOL at execution.",
+            "type": "integer"
+          },
+          "total_volume_usd": {
+            "description": "The Usd twins are the same figures on the trades' USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "window": {
@@ -8572,27 +8653,43 @@
             "description": "CashbackVolumeLamports — the window's quote-side volume on\ncashback-enabled coins; TotalVolumeLamports the window's whole\nquote-side volume (buy in + sell out). VolumeShare divides the two\n(nil when no volume); AvgCashbackBps = earned / cashback volume in\nbasis points (nil when no cashback volume) — the effective rebate\nrate, which is per-coin on-chain (30 and 90 bps both live).",
             "type": "integer"
           },
+          "cashback_volume_usd": {
+            "type": "integer"
+          },
           "claim_count": {
             "description": "Claim cadence, lifetime, all quote denominations.",
             "type": "integer"
           },
           "claimable_lamports": {
-            "description": "ClaimableLamports is the unclaimed balance sitting in the wallet's\naccumulators: cashback accrued SINCE its last claim. A claim sweeps\nthe accumulator in full, so the balance at that moment is 0 and\neverything after it is unclaimed — which makes this immune both to\nthe claim ledger's TTL and to history that predates our ingest, since\nonly a timestamp comes from the claim side. Wallets that never claimed\nreport everything we have observed them earn. Reads LOW, never high\n(see cashbackAccruedSince for the two bounded undercounts).",
+            "description": "ClaimableLamports is the unclaimed balance sitting in the wallet's\naccumulators: cashback accrued SINCE its last claim. A claim sweeps the\naccumulator in full, so the balance at that moment is 0 and everything\nafter it is unclaimed; the accrual is counted from the hour after the\nclaim, so the figure reads low, never high. Wallets that never claimed\nreport everything they have been observed to earn.",
+            "type": "integer"
+          },
+          "claimable_usd": {
             "type": "integer"
           },
           "claimed_lamports": {
             "description": "ClaimedLamports — WSOL cashback swept by claim_cashback in the window.\nThis is the cash-basis component net PnL ADDS (page, series, board —\nall three fold the same claimed numbers, #c22).",
             "type": "integer"
           },
+          "claimed_usd": {
+            "type": "integer"
+          },
           "earned_lamports": {
             "description": "EarnedLamports — cashback ACCRUED by the window's swaps (the exact\nper-swap amounts from the pump trade events, WSOL-quoted markets\nonly). Informational: the net-PnL formulas fold CLAIMED, not this.",
+            "type": "integer"
+          },
+          "earned_usd": {
+            "description": "The Usd twins are the same figures on the events' USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "holder_reward_payouts": {
             "type": "integer"
           },
           "holder_rewards_lamports": {
-            "description": "The holder-reward half of the same panel (CA 000220). pump PUSHES\nthese, so there is no accrued/claimed pair and nothing to claim:\nHolderRewardsLamports is already a receipt, and the payout count is\nthe cadence figure ClaimCount is for cashback. Lifetime is exact —\nthe receipt ledger carries no TTL — but both lamport figures count\nonly payouts whose quote could be priced in SOL, because a coin\npaired with another token pays in that token (CA r89).",
+            "description": "The holder-reward half of the same panel. pump PUSHES these, so there\nis no accrued/claimed pair and nothing to claim: HolderRewardsLamports\nis already a receipt, and the payout count is the cadence figure\nClaimCount is for cashback. Lifetime is exact, but both lamport figures\ncount only payouts whose quote could be priced in SOL, because a coin\npaired with another token pays in that token.",
+            "type": "integer"
+          },
+          "holder_rewards_usd": {
             "type": "integer"
           },
           "last_claim_at": {
@@ -8601,8 +8698,14 @@
           "lifetime_claimed_lamports": {
             "type": "integer"
           },
+          "lifetime_claimed_usd": {
+            "type": "integer"
+          },
           "lifetime_earned_lamports": {
-            "description": "LifetimeEarnedLamports is exact: it comes from `trader_stats.cashback`,\nwhich is untimed, WSOL-only by construction and rebuildable from\n`swaps`. LifetimeClaimedLamports is bounded by the raw claim ledger's\n75-day retention (CA 000098) — the same compromise reliability's \"all\"\nwindow makes, undercounting rather than inventing. ProgramTotals below\ncarries the program's own all-time figures beside it.",
+            "description": "LifetimeEarnedLamports and LifetimeClaimedLamports are the lifetime\nfamilies of the wallet's board row. ProgramTotals below carries the\nprogram's own all-time figures beside them.",
+            "type": "integer"
+          },
+          "lifetime_earned_usd": {
             "type": "integer"
           },
           "lifetime_holder_reward_payouts": {
@@ -8611,8 +8714,11 @@
           "lifetime_holder_rewards_lamports": {
             "type": "integer"
           },
+          "lifetime_holder_rewards_usd": {
+            "type": "integer"
+          },
           "program_totals": {
-            "description": "ProgramTotals — the lifetime running totals the pump program itself\nstamped on the wallet's LATEST claim event, one row per program\n(pumpfun = bonding curve, pumpswap = AMM), read from\n`cashback_claim_anchors` so they outlive the raw ledger's TTL. They\ncover history from before our ingest and are surfaced verbatim as\n\"program-reported\" — DISPLAY ONLY. Never fold them into a lamport\nfigure: the on-chain counter is one u64 per accumulator and cashback\nis not SOL-only (~7% of sampled claims carried a USDC quote), so\nwhether it mixes denominations is not observable from the event.\nEmpty array when the wallet never claimed.",
+            "description": "ProgramTotals — the lifetime running totals the pump program itself\nstamped on the wallet's LATEST claim event, one row per program\n(pumpfun = bonding curve, pumpswap = AMM), read from\n`cashback_claim_anchors`. They cover history from before the ledger\nbegan and are surfaced verbatim as\n\"program-reported\" — DISPLAY ONLY. Never fold them into a lamport\nfigure: the on-chain counter is one u64 per accumulator and cashback\nis not SOL-only (~7% of sampled claims carried a USDC quote), so\nwhether it mixes denominations is not observable from the event.\nEmpty array when the wallet never claimed.",
             "items": {
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.CashbackProgramTotals"
             },
@@ -8631,6 +8737,9 @@
           "total_volume_lamports": {
             "type": "integer"
           },
+          "total_volume_usd": {
+            "type": "integer"
+          },
           "volume_share": {
             "type": "number"
           },
@@ -8643,46 +8752,74 @@
       "pulsight_internal_core_domain_aggregator.TraderPeriodStatsRow": {
         "properties": {
           "arb_pnl_lamports": {
-            "description": "ArbPnlLamports — the window's arbitrage take-home (tx-grain, CA\n000158), ALREADY included in RealizedProfit and NetRealizedProfit.\nExposed so the UI can show the split.",
+            "description": "ArbPnlLamports — the window's arbitrage take-home (tx-grain), ALREADY\nincluded in RealizedProfit and NetRealizedProfit. Exposed so the UI can\nshow the split.",
+            "type": "integer"
+          },
+          "arb_pnl_usd": {
             "type": "integer"
           },
           "arb_tx_ratio": {
-            "description": "ArbTxRatio is the fraction (0..1) of the window's swaps that were\narbitrage txs (is_arb). 0 when the window has no swaps.",
+            "description": "ArbTxRatio is the fraction (0..1) of the window's transactions that\nwere arbitrage. 0 when the window has no trades.",
             "type": "number"
           },
           "buy_amount_lamports": {
+            "type": "integer"
+          },
+          "buy_amount_usd": {
+            "description": "The Usd twins are the same money figures on the trades' USD stamps\n(micro-USD), with the win/loss split and winrate measured on them.",
             "type": "integer"
           },
           "buy_sell_ratio": {
             "type": "number"
           },
           "cashback_claimed_lamports": {
-            "description": "CashbackClaimedLamports — WSOL pump cashback the wallet CLAIMED in the\nwindow (cash basis; CA 000097). The one POSITIVE cost-block component.",
+            "description": "CashbackClaimedLamports — pump cashback the wallet CLAIMED and kept in\nthe window (cash basis). A POSITIVE cost-block component.",
+            "type": "integer"
+          },
+          "cashback_claimed_usd": {
             "type": "integer"
           },
           "didnt_buy_sells": {
-            "description": "DidntBuySells / SoldGtBoughtSells count the window's uncovered\nsells: countIf(sold_without_buy) and countIf(sold_more_than_bought)\nover `swaps`. Replaces the retired phantom proceeds split (CA\nmigration 000018_remove_phantom_tracking).",
+            "description": "DidntBuySells / SoldGtBoughtSells count the window's uncovered sells:\nsells of a mint with no observed buy, and sells that exceeded the\nobserved bought balance.",
             "type": "integer"
           },
           "failed_cost_lamports": {
-            "description": "FailedCostLamports — fees burned on failed venue-mentioning txs plus\nthe fees+tips of landed no-CPI arb probes, from the failed-tx rollups\n(CA 000094). 0 when the ledger isn't populated for the window.",
+            "description": "FailedCostLamports — fees burned on failed venue-mentioning txs plus\nthe fees+tips of landed no-CPI arb probes. 0 when none were recorded.",
+            "type": "integer"
+          },
+          "failed_cost_usd": {
             "type": "integer"
           },
           "loss_profit": {
             "type": "integer"
           },
+          "loss_profit_usd": {
+            "type": "integer"
+          },
           "loss_sells": {
             "type": "integer"
           },
+          "loss_sells_usd": {
+            "type": "integer"
+          },
           "net_realized_profit": {
-            "description": "NetRealizedProfit = RealizedProfit − TotalFees − TotalTips −\nFailedCostLamports + CashbackClaimedLamports: what the wallet\nactually kept. This is the HEADLINE PnL; RealizedProfit is the\npre-cost component (accrual + arb take-home). Mirrors\nrollupWindowAgg.netPnl and boardWindowExpr (#c22).",
+            "description": "NetRealizedProfit is the board row's net PnL: RealizedProfit minus\nTotalFees, TotalTips and FailedCostLamports, plus the kept cashback and\nthe holder rewards received — what the wallet actually kept. This is the\nHEADLINE PnL; RealizedProfit is the pre-cost component (accrual + arb\ntake-home).",
+            "type": "integer"
+          },
+          "net_realized_profit_usd": {
             "type": "integer"
           },
           "realized_profit": {
-            "description": "RealizedProfit is the window's PnL: accrual realized profit PLUS the\narbitrage take-home (ArbPnlLamports). The two are disjoint upstream\n(arb round-trip rows book zero realized, r71), so the sum is exact.",
+            "description": "RealizedProfit is the window's PnL: accrual realized profit PLUS the\narbitrage take-home (ArbPnlLamports). The two are disjoint (an arb round\ntrip books zero realized), so the sum is exact.",
+            "type": "integer"
+          },
+          "realized_profit_usd": {
             "type": "integer"
           },
           "sell_amount_lamports": {
+            "type": "integer"
+          },
+          "sell_amount_usd": {
             "type": "integer"
           },
           "sold_gt_bought_sells": {
@@ -8695,11 +8832,13 @@
             "type": "integer"
           },
           "total_buys": {
-            "description": "Count fields are int64, not int: periodStatsOne casts them with\ntoInt64() in SQL, and clickhouse-go scans an Int64 column only into\n*int64 (it rejects *int with code-typed \"try using *int64\"). JSON\nserialisation is identical either way.",
             "type": "integer"
           },
           "total_fees": {
-            "description": "TotalFees is the window's tx fees (base + priority) counted ONCE PER\nTRANSACTION: sum(priority_fee_lamports) + 5000 × uniq(signature).\n`swaps.fee` itself is stamped on every trade row of a tx, so the old\nsumIf(fee) double-counted multi-trade (arb) txs; priority/tips are\nfirst-row-only stamped, so their plain sums are exact and only the\n5000-lamport base rides the (near-exact) uniq count.",
+            "description": "TotalFees is the window's execution costs other than tips: network fees\n(base + priority) counted once per transaction, plus venue, platform and\ncashback-on-top fees.",
+            "type": "integer"
+          },
+          "total_fees_usd": {
             "type": "integer"
           },
           "total_sells": {
@@ -8709,19 +8848,31 @@
             "description": "TotalTips — builder/MEV tips paid on the window's successful txs.",
             "type": "integer"
           },
+          "total_tips_usd": {
+            "type": "integer"
+          },
           "trader": {
             "type": "string"
           },
           "win_profit": {
             "type": "integer"
           },
+          "win_profit_usd": {
+            "type": "integer"
+          },
           "win_sells": {
+            "type": "integer"
+          },
+          "win_sells_usd": {
             "type": "integer"
           },
           "window_label": {
             "type": "string"
           },
           "winrate": {
+            "type": "number"
+          },
+          "winrate_usd": {
             "type": "number"
           }
         },
@@ -8730,7 +8881,7 @@
       "pulsight_internal_core_domain_aggregator.TraderPriceImpactStats": {
         "properties": {
           "avg_price_impact_bps": {
-            "description": "AvgBps is the mean and MedianBps the p50 over the measurable legs of the\nwallet's most recent fills in the window (a bounded sample, up to 3000\nfills). Both are reported because the population is heavy-tailed — a\nhandful of large fills into thin curves dominate the mean while the\nmedian describes the wallet's ordinary fill.\n\nPOINTERS, because 0 bps is a REAL answer (a wallet trading tiny size\ninto deep pools) and \"we could not measure it\" must not read as it.\nNil when Swaps is 0 — most often a wallet trading only concentrated\nliquidity, whose vault balances are not a curve.",
+            "description": "AvgBps is the mean and MedianBps the p50 over the wallet's measurable\nlegs in the window. Both are reported because the population is\nheavy-tailed — a handful of large fills into thin curves dominate the\nmean while the median describes the wallet's ordinary fill.\n\nPOINTERS, because 0 bps is a REAL answer (a wallet trading tiny size\ninto deep pools) and \"we could not measure it\" must not read as it.\nNil when Swaps is 0 — most often a wallet trading only concentrated\nliquidity, whose vault balances are not a curve.",
             "type": "number"
           },
           "median_price_impact_bps": {
@@ -8755,7 +8906,11 @@
             "type": "integer"
           },
           "failed_fee_lamports": {
-            "description": "Lamports burned on failed txs (base + priority fee) vs on landed\nno-CPI probes, plus tips the probes paid.",
+            "description": "FailedFeeLamports is the network fee (base plus priority) the wallet\nburned on its reverted transactions and landed no-CPI arb probes in the\nwindow; NoCpiTipLamports is the tips those transactions paid;\nNoCpiFeeLamports is unused (the fee of a no-CPI probe is in\nFailedFeeLamports).",
+            "type": "integer"
+          },
+          "failed_fee_usd": {
+            "description": "FailedFeeUsd / NoCpiTipUsd are the two cost lines on their USD\nstamps (micro-USD).",
             "type": "integer"
           },
           "failed_other": {
@@ -8769,7 +8924,7 @@
             "type": "integer"
           },
           "landed_txs": {
-            "description": "LandedTxs is uniqExact(signature) over the wallet's `swaps` rows in\nthe window — successful swap TRANSACTIONS, not legs or trades.",
+            "description": "LandedTxs counts the wallet's distinct landed transactions in the\nwindow — transactions, not legs or trades.",
             "type": "integer"
           },
           "no_cpi_fee_lamports": {
@@ -8778,11 +8933,14 @@
           "no_cpi_tip_lamports": {
             "type": "integer"
           },
+          "no_cpi_tip_usd": {
+            "type": "integer"
+          },
           "no_cpi_txs": {
             "type": "integer"
           },
           "observed_landed_txs": {
-            "description": "ObservedLandedTxs is LandedTxs narrowed to the hours the failed-tx\nstream was actually running. Failed transactions are only recorded for\nthose hours — a historical backfill drops them at the fetch layer, and\nnothing observed them before the feature shipped — so this is the only\nlanded count the rates below may divide by. It equals LandedTxs once a\nwindow is fully observed; the gap is how much of the window is\nun-scored.",
+            "description": "ObservedLandedTxs is LandedTxs narrowed to the hours in which failed\ntransactions were recorded (`observed_hours`). Failed transactions exist\nonly for those hours, so this is the only landed count the rates below\nmay divide by. It equals LandedTxs once a window is fully observed; the\ngap is how much of the window is un-scored.",
             "type": "integer"
           },
           "pubkey": {
@@ -9079,50 +9237,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_trader.DailyProfit": {
-        "properties": {
-          "buy_amount_usd": {
-            "type": "number"
-          },
-          "created_at": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "loss_profit": {
-            "type": "number"
-          },
-          "loss_sells": {
-            "type": "integer"
-          },
-          "sell_amount_usd": {
-            "type": "number"
-          },
-          "total_buys": {
-            "type": "integer"
-          },
-          "total_profit": {
-            "type": "number"
-          },
-          "total_sells": {
-            "type": "integer"
-          },
-          "trader_id": {
-            "type": "string"
-          },
-          "win_profit": {
-            "type": "number"
-          },
-          "win_sells": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "pulsight_internal_core_domain_trader.Filter": {
         "properties": {
           "created_at": {
@@ -9150,113 +9264,8 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_trader.Pnl": {
-        "properties": {
-          "balance": {
-            "description": "Position",
-            "type": "number"
-          },
-          "buy_tx_count": {
-            "description": "Activity",
-            "type": "integer"
-          },
-          "created_at": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "last_active_timestamp": {
-            "type": "integer"
-          },
-          "open_timestamp": {
-            "description": "Timing",
-            "type": "integer"
-          },
-          "realized_profit": {
-            "type": "number"
-          },
-          "sell_tx_count": {
-            "type": "integer"
-          },
-          "start_holding_at": {
-            "type": "integer"
-          },
-          "token_address": {
-            "description": "Token info",
-            "type": "string"
-          },
-          "token_logo": {
-            "type": "string"
-          },
-          "token_name": {
-            "type": "string"
-          },
-          "token_price": {
-            "type": "number"
-          },
-          "token_symbol": {
-            "type": "string"
-          },
-          "total_profit": {
-            "type": "number"
-          },
-          "total_profit_pnl": {
-            "type": "number"
-          },
-          "trader_id": {
-            "type": "string"
-          },
-          "unrealized_profit": {
-            "type": "number"
-          },
-          "updated_at": {
-            "type": "string"
-          },
-          "usd_value": {
-            "type": "number"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_domain_trader.Tag": {
-        "properties": {
-          "created_at": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "source": {
-            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TagSource"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_domain_trader.TagSource": {
-        "enum": [
-          "computed",
-          "manual",
-          "aggregator"
-        ],
-        "type": "string",
-        "x-enum-varnames": [
-          "TagSourceComputed",
-          "TagSourceManual",
-          "TagSourceAggregator"
-        ]
-      },
       "pulsight_internal_core_domain_trader.Trader": {
         "properties": {
-          "active_hours_count": {
-            "type": "integer"
-          },
           "arb_tx_ratio_1d": {
             "type": "number"
           },
@@ -9268,9 +9277,6 @@
           },
           "arb_tx_ratio_all": {
             "type": "number"
-          },
-          "avatar": {
-            "type": "string"
           },
           "avg_buy_count_per_token": {
             "description": "Per-token buy/sell counts",
@@ -9287,13 +9293,25 @@
           "avg_realized_profit_1d": {
             "type": "number"
           },
+          "avg_realized_profit_1d_usd": {
+            "type": "number"
+          },
           "avg_realized_profit_30d": {
+            "type": "number"
+          },
+          "avg_realized_profit_30d_usd": {
             "type": "number"
           },
           "avg_realized_profit_7d": {
             "type": "number"
           },
+          "avg_realized_profit_7d_usd": {
+            "type": "number"
+          },
           "avg_realized_profit_all": {
+            "type": "number"
+          },
+          "avg_realized_profit_all_usd": {
             "type": "number"
           },
           "avg_sell_count_per_token": {
@@ -9324,20 +9342,29 @@
           "buy_sell_ratio_all": {
             "type": "number"
           },
-          "buy_size_cv": {
-            "type": "number"
-          },
           "cashback_1d": {
             "type": "number"
           },
+          "cashback_1d_usd": {
+            "type": "number"
+          },
           "cashback_30d": {
+            "type": "number"
+          },
+          "cashback_30d_usd": {
             "type": "number"
           },
           "cashback_7d": {
             "description": "Pump cashback, lamports. `Cashback*` is what ACCRUED in the window\n(the screening signal); `CashbackClaimed*` is what was swept, and is\nthe component already folded into NetProfit* — do not add it again.",
             "type": "number"
           },
+          "cashback_7d_usd": {
+            "type": "number"
+          },
           "cashback_all": {
+            "type": "number"
+          },
+          "cashback_all_usd": {
             "type": "number"
           },
           "cashback_claim_count_1d": {
@@ -9355,13 +9382,25 @@
           "cashback_claimed_1d": {
             "type": "number"
           },
+          "cashback_claimed_1d_usd": {
+            "type": "number"
+          },
           "cashback_claimed_30d": {
+            "type": "number"
+          },
+          "cashback_claimed_30d_usd": {
             "type": "number"
           },
           "cashback_claimed_7d": {
             "type": "number"
           },
+          "cashback_claimed_7d_usd": {
+            "type": "number"
+          },
           "cashback_claimed_all": {
+            "type": "number"
+          },
+          "cashback_claimed_all_usd": {
             "type": "number"
           },
           "cashback_share_1d": {
@@ -9383,12 +9422,6 @@
           "created_at": {
             "type": "string"
           },
-          "daily_profits": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.DailyProfit"
-            },
-            "type": "array"
-          },
           "didnt_buy_sells_1d": {
             "type": "integer"
           },
@@ -9396,14 +9429,11 @@
             "type": "integer"
           },
           "didnt_buy_sells_7d": {
-            "description": "Uncovered-sell counters for the window (CA migration 000018):\nsells with no observed buy of the mint / sells exceeding the\nobserved bought balance.",
+            "description": "Uncovered-sell counters for the window: sells with no observed buy of\nthe mint / sells exceeding the observed bought balance.",
             "type": "integer"
           },
           "didnt_buy_sells_all": {
             "type": "integer"
-          },
-          "dust_tx_ratio": {
-            "type": "number"
           },
           "failed_txs_1d": {
             "type": "integer"
@@ -9432,20 +9462,29 @@
           "holder_rewards_1d": {
             "type": "number"
           },
+          "holder_rewards_1d_usd": {
+            "type": "number"
+          },
           "holder_rewards_30d": {
+            "type": "number"
+          },
+          "holder_rewards_30d_usd": {
             "type": "number"
           },
           "holder_rewards_7d": {
             "type": "number"
           },
+          "holder_rewards_7d_usd": {
+            "type": "number"
+          },
           "holder_rewards_all": {
+            "type": "number"
+          },
+          "holder_rewards_all_usd": {
             "type": "number"
           },
           "id": {
             "type": "string"
-          },
-          "is_favorite": {
-            "type": "boolean"
           },
           "label": {
             "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the wallet isn't labelled.",
@@ -9482,99 +9521,84 @@
           "median_realized_profit_1d": {
             "type": "number"
           },
+          "median_realized_profit_1d_usd": {
+            "type": "number"
+          },
           "median_realized_profit_30d": {
+            "type": "number"
+          },
+          "median_realized_profit_30d_usd": {
             "type": "number"
           },
           "median_realized_profit_7d": {
             "type": "number"
           },
+          "median_realized_profit_7d_usd": {
+            "type": "number"
+          },
           "median_realized_profit_all": {
+            "type": "number"
+          },
+          "median_realized_profit_all_usd": {
             "type": "number"
           },
           "median_sell_count_per_token": {
             "type": "number"
           },
-          "mm_score": {
-            "type": "integer"
-          },
-          "name": {
-            "description": "Identifiers / social",
-            "type": "string"
-          },
           "net_profit_1d": {
+            "type": "number"
+          },
+          "net_profit_1d_usd": {
             "type": "number"
           },
           "net_profit_30d": {
             "type": "number"
           },
+          "net_profit_30d_usd": {
+            "type": "number"
+          },
           "net_profit_7d": {
-            "description": "Realized profit per-mint averages / medians. UNIT: lamports\n(frontend FormattedSol divides by 1e9 on display).\nNet-of-costs windowed figures (CA migration 000095). NetProfit is\nrealized PnL minus tips, per-transaction fees and the fees burned on\nfailed / no-CPI transactions — what the wallet actually kept. The\ngross figure stays on RealizedProfit*d so both are readable.\nSuccessRate / SpamRate are nil when the window observed no\ntransactions at all (0 would read as \"never lands\").",
+            "description": "Net-of-costs windowed figures, lamports. NetProfit is realized PnL\nminus tips, per-transaction fees and the fees burned on failed / no-CPI\ntransactions — what the wallet actually kept. The gross figure stays on\nRealizedProfit*d so both are readable. SuccessRate / SpamRate are nil\nwhen the window observed no transactions at all (0 would read as\n\"never lands\").",
+            "type": "number"
+          },
+          "net_profit_7d_usd": {
             "type": "number"
           },
           "net_profit_all": {
             "type": "number"
           },
+          "net_profit_all_usd": {
+            "type": "number"
+          },
           "oldest_trade_at": {
             "type": "integer"
           },
-          "pnl_0x2x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_0x2x_num_7d": {
-            "description": "0x to 2x",
-            "type": "integer"
-          },
-          "pnl_2x5x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_2x5x_num_7d": {
-            "description": "2x to 5x",
-            "type": "integer"
-          },
-          "pnl_gt5x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_gt5x_num_7d": {
-            "description": "> 5x",
-            "type": "integer"
-          },
-          "pnl_lt_nd5_num_30d": {
-            "description": "PnL distribution buckets — 30d",
-            "type": "integer"
-          },
-          "pnl_lt_nd5_num_7d": {
-            "description": "PnL distribution buckets — 7d",
-            "type": "integer"
-          },
-          "pnl_nd50x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_nd50x_num_7d": {
-            "description": "-5x to 0x",
-            "type": "integer"
-          },
-          "pnls": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Pnl"
-            },
-            "type": "array"
-          },
-          "profit_per_trade": {
-            "type": "number"
-          },
           "realized_profit": {
+            "description": "RealizedProfit is the lifetime realized PnL in lamports.",
             "type": "number"
           },
           "realized_profit_1d": {
             "description": "1-day window. Same measures and same derivations as the 7d/30d\nblocks, hydrated per page rather than read off the board — so these\nare DISPLAY-only: neither sorting nor an `f=` clause can address them.",
             "type": "number"
           },
+          "realized_profit_1d_usd": {
+            "type": "number"
+          },
           "realized_profit_30d": {
             "description": "30-day period",
             "type": "number"
           },
+          "realized_profit_30d_usd": {
+            "type": "number"
+          },
           "realized_profit_7d": {
-            "description": "7-day period. UNIT for realized_profit_*: lamports.",
+            "description": "7-day period. Money figures are lamports; TotalProfit7d and\nTotalProfitPnl7d repeat the realized PnL and ROI.",
+            "type": "number"
+          },
+          "realized_profit_7d_usd": {
+            "type": "number"
+          },
+          "realized_profit_all_usd": {
             "type": "number"
           },
           "realized_profit_pnl_30d": {
@@ -9583,34 +9607,48 @@
           "realized_profit_pnl_7d": {
             "type": "number"
           },
-          "rebalancing_ratio": {
-            "type": "number"
-          },
           "rewards_total_1d": {
             "type": "number"
           },
+          "rewards_total_1d_usd": {
+            "type": "number"
+          },
           "rewards_total_30d": {
+            "type": "number"
+          },
+          "rewards_total_30d_usd": {
             "type": "number"
           },
           "rewards_total_7d": {
             "description": "Pump holder rewards, lamports. Pushed rather than claimed, so the one\nfigure is already a receipt and is what net PnL folds; the payout count\ncounts every payout, including one on a coin whose quote could not be\npriced in SOL and therefore adds no lamports.",
             "type": "number"
           },
+          "rewards_total_7d_usd": {
+            "type": "number"
+          },
           "rewards_total_all": {
             "type": "number"
           },
-          "risk_level": {
-            "type": "string"
-          },
-          "risk_score": {
-            "description": "Risk assessment",
-            "type": "integer"
+          "rewards_total_all_usd": {
+            "type": "number"
           },
           "roi_1d": {
             "type": "number"
           },
+          "roi_1d_usd": {
+            "type": "number"
+          },
+          "roi_30d_usd": {
+            "type": "number"
+          },
+          "roi_7d_usd": {
+            "type": "number"
+          },
           "roi_all": {
             "description": "Lifetime window, also DISPLAY-only. The gross figure is RealizedProfit\nabove. There is deliberately no lifetime failure record: the failed-tx\nplanes are TTL-bounded to three months while the landed side is not,\nso a lifetime success or spam rate would be structurally flattering.",
+            "type": "number"
+          },
+          "roi_all_usd": {
             "type": "number"
           },
           "sell_1d": {
@@ -9626,7 +9664,7 @@
             "type": "integer"
           },
           "sol_balance": {
-            "description": "Balances. UNIT: lamports (BIGINT, held as *float64 for wire\ncompatibility). The field name says \"Sol\" for historical reasons;\nthe wire convention is lamports because the frontend's\nFormattedSol component divides by 1e9 itself.",
+            "description": "SolBalance is the wallet's SOL balance in lamports.",
             "type": "number"
           },
           "sold_gt_bought_sells_1d": {
@@ -9660,9 +9698,9 @@
             "type": "number"
           },
           "tags": {
-            "description": "Relations (loaded on demand)",
+            "description": "Tags are derived from the ledger at read time (deriveTags).",
             "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Tag"
+              "type": "string"
             },
             "type": "array"
           },
@@ -9681,17 +9719,25 @@
           "total_costs_1d": {
             "type": "number"
           },
+          "total_costs_1d_usd": {
+            "type": "number"
+          },
           "total_costs_30d": {
+            "type": "number"
+          },
+          "total_costs_30d_usd": {
             "type": "number"
           },
           "total_costs_7d": {
             "type": "number"
           },
+          "total_costs_7d_usd": {
+            "type": "number"
+          },
           "total_costs_all": {
             "type": "number"
           },
-          "total_profit": {
-            "description": "Profit stats (all-time). UNIT: lamports (see SolBalance note).",
+          "total_costs_all_usd": {
             "type": "number"
           },
           "total_profit_30d": {
@@ -9706,37 +9752,6 @@
           "total_profit_pnl_7d": {
             "type": "number"
           },
-          "total_value": {
-            "type": "number"
-          },
-          "total_volume_usd": {
-            "type": "number"
-          },
-          "trade_interval_cv": {
-            "type": "number"
-          },
-          "trade_interval_mean": {
-            "description": "Market-maker detection",
-            "type": "number"
-          },
-          "twitter_username": {
-            "type": "string"
-          },
-          "unrealized_profit": {
-            "type": "number"
-          },
-          "unrealized_profit_30d": {
-            "type": "number"
-          },
-          "unrealized_profit_7d": {
-            "type": "number"
-          },
-          "unrealized_profit_pnl_30d": {
-            "type": "number"
-          },
-          "unrealized_profit_pnl_7d": {
-            "type": "number"
-          },
           "updated_at": {
             "type": "string"
           },
@@ -9746,13 +9761,25 @@
           "winrate_1d": {
             "type": "number"
           },
+          "winrate_1d_usd": {
+            "type": "number"
+          },
           "winrate_30d": {
+            "type": "number"
+          },
+          "winrate_30d_usd": {
             "type": "number"
           },
           "winrate_7d": {
             "type": "number"
           },
+          "winrate_7d_usd": {
+            "type": "number"
+          },
           "winrate_all": {
+            "type": "number"
+          },
+          "winrate_all_usd": {
             "type": "number"
           }
         },
@@ -10534,94 +10561,28 @@
           "TradeSourceScopeExit"
         ]
       },
-      "pulsight_internal_core_usecases_trader.DailyProfitEntry": {
-        "properties": {
-          "date": {
-            "type": "string"
-          },
-          "total_profit": {
-            "type": "number"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_usecases_trader.DailyProfitListItem": {
-        "properties": {
-          "buy_amount_usd": {
-            "type": "number"
-          },
-          "created_at": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "loss_profit": {
-            "type": "number"
-          },
-          "loss_sells": {
-            "type": "integer"
-          },
-          "sell_amount_usd": {
-            "type": "number"
-          },
-          "total_buys": {
-            "type": "integer"
-          },
-          "total_profit": {
-            "type": "number"
-          },
-          "total_sells": {
-            "type": "integer"
-          },
-          "trader_id": {
-            "type": "string"
-          },
-          "win_profit": {
-            "type": "number"
-          },
-          "win_sells": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_usecases_trader.DailyProfitsResult": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.DailyProfitListItem"
-            },
-            "type": "array"
-          },
-          "limit": {
-            "type": "integer"
-          },
-          "offset": {
-            "type": "integer"
-          },
-          "total": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "pulsight_internal_core_usecases_trader.PnlSeriesPoint": {
         "properties": {
           "arb_pnl": {
-            "description": "ArbPnl is the day's arbitrage take-home (tx-grain, CA 000158). It is\nALREADY included in Profit and Net — exposed separately so the UI can\nshow the split. Arb round-trip rows book zero realized PnL upstream,\nso the inclusion never double-counts.",
+            "description": "ArbPnl is the day's arbitrage take-home (tx-grain). It is\nALREADY included in Profit and Net — exposed separately so the UI can\nshow the split. Arb round-trip rows book zero realized PnL upstream,\nso the inclusion never double-counts.",
+            "type": "integer"
+          },
+          "arb_pnl_usd": {
             "type": "integer"
           },
           "cashback": {
+            "type": "integer"
+          },
+          "cashback_usd": {
             "type": "integer"
           },
           "day": {
             "type": "string"
           },
           "failed_cost": {
+            "type": "integer"
+          },
+          "failed_cost_usd": {
             "type": "integer"
           },
           "failed_txs": {
@@ -10631,6 +10592,9 @@
             "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nagainst what pump paid the wallet that day — cashback CLAIMED and\nholder rewards RECEIVED, both cash basis — with `net = profit - fees\n- tips - failed_cost + cashback + holder_rewards` (profit already\nincludes the arbitrage take-home). The charts plot NET as the headline\nseries; `profit` stays as the flat/gross component.",
             "type": "integer"
           },
+          "fees_usd": {
+            "type": "integer"
+          },
           "holder_reward_payouts": {
             "type": "integer"
           },
@@ -10638,10 +10602,20 @@
             "description": "HolderRewards is the day's holder-reward payouts valued in SOL, and\nHolderRewardPayouts how many payouts there were. A payout in a quote\nwe cannot price in SOL adds nothing to the value but still counts, so\na day can carry payouts with zero lamports.",
             "type": "integer"
           },
+          "holder_rewards_usd": {
+            "type": "integer"
+          },
           "net": {
             "type": "integer"
           },
+          "net_usd": {
+            "type": "integer"
+          },
           "profit": {
+            "type": "integer"
+          },
+          "profit_usd": {
+            "description": "The Usd twins are the same day's figures on the trades' USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "success_rate": {
@@ -10650,8 +10624,11 @@
           "tips": {
             "type": "integer"
           },
+          "tips_usd": {
+            "type": "integer"
+          },
           "txs": {
-            "description": "Txs is the day's landed transaction count; FailedTxs the failed-tx\nledger's failed swaps+arbs+other. SuccessRate divides the OBSERVED\nlanded count (failed-tx-watched hours only, CA 000096) by\nobserved+failed — nil when no hour of the day was observed, so\npre-ledger history reads \"not measured\" rather than a fake 100%.",
+            "description": "Txs is the day's landed transaction count; FailedTxs the failed-tx\nledger's failed swaps+arbs+other. SuccessRate divides the OBSERVED\nlanded count (the `observed_hours` only) by observed+failed — nil\nwhen no hour of the day was observed, so unobserved history reads\n\"not measured\" rather than a fake 100%.",
             "type": "integer"
           }
         },
@@ -10673,9 +10650,6 @@
       },
       "pulsight_internal_core_usecases_trader.TraderListItem": {
         "properties": {
-          "active_hours_count": {
-            "type": "integer"
-          },
           "arb_tx_ratio_1d": {
             "type": "number"
           },
@@ -10700,13 +10674,25 @@
           "avg_realized_profit_1d": {
             "type": "number"
           },
+          "avg_realized_profit_1d_usd": {
+            "type": "number"
+          },
           "avg_realized_profit_30d": {
+            "type": "number"
+          },
+          "avg_realized_profit_30d_usd": {
             "type": "number"
           },
           "avg_realized_profit_7d": {
             "type": "number"
           },
+          "avg_realized_profit_7d_usd": {
+            "type": "number"
+          },
           "avg_realized_profit_all": {
+            "type": "number"
+          },
+          "avg_realized_profit_all_usd": {
             "type": "number"
           },
           "avg_sell_count_per_token": {
@@ -10753,20 +10739,29 @@
           "buy_sell_ratio_all": {
             "type": "number"
           },
-          "buy_size_cv": {
-            "type": "number"
-          },
           "cashback_1d": {
             "type": "number"
           },
+          "cashback_1d_usd": {
+            "type": "number"
+          },
           "cashback_30d": {
+            "type": "number"
+          },
+          "cashback_30d_usd": {
             "type": "number"
           },
           "cashback_7d": {
             "description": "Pump cashback: accrued in the window (the screening signal) and\nswept. Claimed is ALREADY inside NetProfit7d — never add it on top.",
             "type": "number"
           },
+          "cashback_7d_usd": {
+            "type": "number"
+          },
           "cashback_all": {
+            "type": "number"
+          },
+          "cashback_all_usd": {
             "type": "number"
           },
           "cashback_claim_count_1d": {
@@ -10784,13 +10779,25 @@
           "cashback_claimed_1d": {
             "type": "number"
           },
+          "cashback_claimed_1d_usd": {
+            "type": "number"
+          },
           "cashback_claimed_30d": {
+            "type": "number"
+          },
+          "cashback_claimed_30d_usd": {
             "type": "number"
           },
           "cashback_claimed_7d": {
             "type": "number"
           },
+          "cashback_claimed_7d_usd": {
+            "type": "number"
+          },
           "cashback_claimed_all": {
+            "type": "number"
+          },
+          "cashback_claimed_all_usd": {
             "type": "number"
           },
           "cashback_share_1d": {
@@ -10811,18 +10818,6 @@
           "created_at": {
             "type": "string"
           },
-          "daily_profit_30d": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.DailyProfitEntry"
-            },
-            "type": "array"
-          },
-          "daily_profit_7d": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.DailyProfitEntry"
-            },
-            "type": "array"
-          },
           "didnt_buy_sells_1d": {
             "type": "integer"
           },
@@ -10830,14 +10825,11 @@
             "type": "integer"
           },
           "didnt_buy_sells_7d": {
-            "description": "Uncovered-sell counters (CA migration 000018): sells with no\nobserved buy of the mint / sells exceeding the observed bought\nbalance, scoped to the window.",
+            "description": "Uncovered-sell counters: sells with no observed buy of the mint /\nsells exceeding the observed bought balance, scoped to the window.",
             "type": "integer"
           },
           "didnt_buy_sells_all": {
             "type": "integer"
-          },
-          "dust_tx_ratio": {
-            "type": "number"
           },
           "failed_txs_1d": {
             "type": "integer"
@@ -10851,9 +10843,6 @@
           "failed_txs_all": {
             "description": "There is deliberately no lifetime success/spam rate here: their\ndenominator is the one read that cannot prune by partition, so it is\nnot paid per listing page. The trader-detail reliability panel serves\nthem per wallet.",
             "type": "integer"
-          },
-          "has_avatar": {
-            "type": "boolean"
           },
           "holder_reward_payouts_1d": {
             "type": "integer"
@@ -10870,24 +10859,37 @@
           "holder_rewards_1d": {
             "type": "number"
           },
+          "holder_rewards_1d_usd": {
+            "type": "number"
+          },
           "holder_rewards_30d": {
+            "type": "number"
+          },
+          "holder_rewards_30d_usd": {
             "type": "number"
           },
           "holder_rewards_7d": {
             "type": "number"
           },
+          "holder_rewards_7d_usd": {
+            "type": "number"
+          },
           "holder_rewards_all": {
             "type": "number"
           },
+          "holder_rewards_all_usd": {
+            "type": "number"
+          },
           "holding_pnl_lamports": {
-            "description": "HoldingPnlLamports is the wallet's current unrealised PnL across\nall open positions, in lamports. Nil when CA has no live price\nquote for any of the held mints.",
+            "description": "HoldingPnlLamports is the wallet's current unrealised PnL across\nall open positions, in lamports, off its board row. Nil when no held\nposition carries a mark.",
+            "type": "number"
+          },
+          "holding_pnl_usd": {
+            "description": "HoldingPnlUsd, PnlDistributionUsd and PnlSparkline7dUsd are the USD\ntwins of the three snapshot figures below (micro-USD, stamped at\nexecution), and TraderUsd carries the twin of every windowed money\nfigure on the row.",
             "type": "number"
           },
           "id": {
             "type": "string"
-          },
-          "is_favorite": {
-            "type": "boolean"
           },
           "label": {
             "description": "Label/LabelType identify a known wallet (CEX/fee/KOL/...) from the\nknown_addresses registry; empty when the wallet isn't labelled.",
@@ -10923,61 +10925,73 @@
           "median_realized_profit_1d": {
             "type": "number"
           },
+          "median_realized_profit_1d_usd": {
+            "type": "number"
+          },
           "median_realized_profit_30d": {
+            "type": "number"
+          },
+          "median_realized_profit_30d_usd": {
             "type": "number"
           },
           "median_realized_profit_7d": {
             "type": "number"
           },
+          "median_realized_profit_7d_usd": {
+            "type": "number"
+          },
           "median_realized_profit_all": {
+            "type": "number"
+          },
+          "median_realized_profit_all_usd": {
             "type": "number"
           },
           "median_sell_count_per_token": {
             "type": "number"
           },
-          "mm_score": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
           "net_profit_1d": {
             "type": "number"
           },
+          "net_profit_1d_usd": {
+            "type": "number"
+          },
           "net_profit_30d": {
+            "type": "number"
+          },
+          "net_profit_30d_usd": {
             "type": "number"
           },
           "net_profit_7d": {
             "description": "Net-of-costs figures — see trader.Trader for the definitions.",
             "type": "number"
           },
+          "net_profit_7d_usd": {
+            "type": "number"
+          },
           "net_profit_all": {
+            "type": "number"
+          },
+          "net_profit_all_usd": {
             "type": "number"
           },
           "oldest_trade_at": {
             "type": "integer"
           },
           "periods": {
-            "description": "Periods is one row per canonical UTC-aligned window (1d, 7d, 30d,\nall) from CA's `trader_period_stats_for`. Drives the\n\"Calendar-based UTC windows\" panel on the trader-detail page.",
+            "description": "Periods is one row per canonical window (1d, 7d, 30d, all) off the\nwallet's board row. Drives the period stats panel on the\ntrader-detail page.",
             "items": {
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderPeriodStatsRow"
             },
             "type": "array"
           },
-          "pnl_0x_2x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_0x_2x_num_7d": {
-            "type": "integer"
-          },
-          "pnl_2x_5x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_2x_5x_num_7d": {
-            "type": "integer"
-          },
           "pnl_distribution": {
             "description": "PnlDistribution is the 5-bucket realised-PnL distribution for\nthe request window: [<-50%, -50–0%, 0–2×, 2–5×, >5×]. Nil when\nthe snapshot wasn't inlined.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "pnl_distribution_usd": {
             "items": {
               "type": "integer"
             },
@@ -10990,33 +11004,18 @@
             },
             "type": "array"
           },
-          "pnl_gt_5x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_gt_5x_num_7d": {
-            "type": "integer"
-          },
-          "pnl_lt_nd5_num_30d": {
-            "type": "integer"
-          },
-          "pnl_lt_nd5_num_7d": {
-            "type": "integer"
-          },
-          "pnl_nd5_0x_num_30d": {
-            "type": "integer"
-          },
-          "pnl_nd5_0x_num_7d": {
-            "type": "integer"
-          },
           "pnl_sparkline_7d": {
-            "description": "PnlSparkline7d is the 7-day realised-PnL series, oldest first,\nexpressed in lamports per day on the wire (matches CA's BIGINT\nstorage and the FormattedSol contract elsewhere). Nil when the\nsnapshot wasn't inlined.",
+            "description": "PnlSparkline7d is the 7-day realised-PnL series, oldest first,\nexpressed in lamports per day on the wire (the FormattedSol\ncontract). Nil when the snapshot wasn't inlined.",
             "items": {
               "type": "number"
             },
             "type": "array"
           },
-          "profit_per_trade": {
-            "type": "number"
+          "pnl_sparkline_7d_usd": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
           },
           "realized_profit": {
             "type": "number"
@@ -11025,10 +11024,22 @@
             "description": "1-day window. Same measures and derivations as the 7d/30d blocks,\nhydrated per page instead of read off the leaderboard — DISPLAY-only,\nso neither `sort` nor an `f=` clause can address these.",
             "type": "number"
           },
+          "realized_profit_1d_usd": {
+            "type": "number"
+          },
           "realized_profit_30d": {
             "type": "number"
           },
+          "realized_profit_30d_usd": {
+            "type": "number"
+          },
           "realized_profit_7d": {
+            "type": "number"
+          },
+          "realized_profit_7d_usd": {
+            "type": "number"
+          },
+          "realized_profit_all_usd": {
             "type": "number"
           },
           "realized_profit_pnl_30d": {
@@ -11037,32 +11048,47 @@
           "realized_profit_pnl_7d": {
             "type": "number"
           },
-          "rebalancing_ratio": {
+          "rewards_total_1d": {
             "type": "number"
           },
-          "rewards_total_1d": {
+          "rewards_total_1d_usd": {
             "type": "number"
           },
           "rewards_total_30d": {
             "type": "number"
           },
+          "rewards_total_30d_usd": {
+            "type": "number"
+          },
           "rewards_total_7d": {
+            "type": "number"
+          },
+          "rewards_total_7d_usd": {
             "type": "number"
           },
           "rewards_total_all": {
             "type": "number"
           },
-          "risk_level": {
-            "type": "string"
-          },
-          "risk_score": {
-            "type": "integer"
+          "rewards_total_all_usd": {
+            "type": "number"
           },
           "roi_1d": {
             "type": "number"
           },
+          "roi_1d_usd": {
+            "type": "number"
+          },
+          "roi_30d_usd": {
+            "type": "number"
+          },
+          "roi_7d_usd": {
+            "type": "number"
+          },
           "roi_all": {
             "description": "Lifetime window, also DISPLAY-only; the gross figure is\nRealizedProfit. No lifetime failure record is served: the failed-tx\nplanes are TTL-bounded to three months while the landed side is not,\nso a lifetime success or spam rate would be structurally flattering.",
+            "type": "number"
+          },
+          "roi_all_usd": {
             "type": "number"
           },
           "sell_1d": {
@@ -11138,16 +11164,25 @@
           "total_costs_1d": {
             "type": "number"
           },
+          "total_costs_1d_usd": {
+            "type": "number"
+          },
           "total_costs_30d": {
+            "type": "number"
+          },
+          "total_costs_30d_usd": {
             "type": "number"
           },
           "total_costs_7d": {
             "type": "number"
           },
+          "total_costs_7d_usd": {
+            "type": "number"
+          },
           "total_costs_all": {
             "type": "number"
           },
-          "total_profit": {
+          "total_costs_all_usd": {
             "type": "number"
           },
           "total_profit_30d": {
@@ -11162,36 +11197,6 @@
           "total_profit_pnl_7d": {
             "type": "number"
           },
-          "total_value": {
-            "type": "number"
-          },
-          "total_volume_usd": {
-            "type": "number"
-          },
-          "trade_interval_cv": {
-            "type": "number"
-          },
-          "trade_interval_mean": {
-            "type": "number"
-          },
-          "twitter_username": {
-            "type": "string"
-          },
-          "unrealized_profit": {
-            "type": "number"
-          },
-          "unrealized_profit_30d": {
-            "type": "number"
-          },
-          "unrealized_profit_7d": {
-            "type": "number"
-          },
-          "unrealized_profit_pnl_30d": {
-            "type": "number"
-          },
-          "unrealized_profit_pnl_7d": {
-            "type": "number"
-          },
           "updated_at": {
             "type": "string"
           },
@@ -11201,13 +11206,25 @@
           "winrate_1d": {
             "type": "number"
           },
+          "winrate_1d_usd": {
+            "type": "number"
+          },
           "winrate_30d": {
+            "type": "number"
+          },
+          "winrate_30d_usd": {
             "type": "number"
           },
           "winrate_7d": {
             "type": "number"
           },
+          "winrate_7d_usd": {
+            "type": "number"
+          },
           "winrate_all": {
+            "type": "number"
+          },
+          "winrate_all_usd": {
             "type": "number"
           }
         },
@@ -11235,6 +11252,10 @@
           },
           "total": {
             "type": "integer"
+          },
+          "unit": {
+            "description": "Unit is the currency the page was ranked, filtered and cursored in\n(sol|usd); every row carries both currencies regardless.",
+            "type": "string"
           }
         },
         "type": "object"
