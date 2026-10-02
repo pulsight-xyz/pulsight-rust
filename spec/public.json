@@ -772,7 +772,7 @@
             }
           },
           {
-            "description": "Mint pubkey prefix or case-insensitive symbol/name substring (lifts the default liquidity floor)",
+            "description": "Mint pubkey prefix, case-insensitive symbol/name substring, or a pool address, which returns the pool's tokens first with `matched_pool` set (lifts the default liquidity floor)",
             "in": "query",
             "name": "search",
             "schema": {
@@ -1064,7 +1064,7 @@
     },
     "/api/mints/{pubkey}/activity": {
       "get": {
-        "description": "Returns the mint's per-minute swap count + network fees (tx fee + MEV tip, lamports) over [from, to), plus the lifetime totals strictly before `from`. Range capped at 25 hours.",
+        "description": "Returns the mint's per-minute swap count + network fees (tx fee + MEV tip, in lamports and in micro-USD as stamped at execution) over [from, to), plus the lifetime totals strictly before `from`. Range capped at 25 hours.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1245,7 +1245,7 @@
     },
     "/api/mints/{pubkey}/insiders": {
       "get": {
-        "description": "Insiders of one mint (wallets reached from the creator over launch-window token transfers, custodial hops excluded) — the SAME set `/risk` counts — in the top-traders row shape. Empty until the insider-stats fold has stored the mint's set. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
+        "description": "Insiders of one mint (wallets reached from the creator over token transfers, pool inventory and the burn address excluded, up to 500 closest to the creator first) — the SAME set `/risk` counts — in the top-traders row shape. A wallet joins within about a minute of the transfer that reaches it and never leaves. sort ∈ {balance,holding_pnl,pnl,volume,swaps,recent} (default balance). Paged via offset. Login required (reveals wallet addresses).",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -2699,7 +2699,7 @@
     },
     "/api/sol-price": {
       "get": {
-        "description": "Returns USD per 1 SOL — the same volume-weighted WSOL/USDC reference the token catalog prices market caps and USD candles with, so displayed figures agree with computed ones. `sol_usd` is `null` when the reference is unavailable (cold analytics store, or no WSOL/USDC trade in the lookback window); it is never `0`.",
+        "description": "Returns USD per 1 SOL — the rate the ledger stamped on the newest landed transaction. Every stored USD figure is the stamp of its own row; this rate converts only a figure that has none. `sol_usd` is `null` when no stamped transaction exists yet; it is never `0`.",
         "responses": {
           "200": {
             "description": "OK",
@@ -3166,6 +3166,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -3238,7 +3248,7 @@
     },
     "/api/swaps": {
       "get": {
-        "description": "Returns the ledger's trade rows filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. `pool` narrows to one or more markets by the trade's primary pool and accepts the same repeated/comma-separated forms, OR-combined — pass the whole set when a token's market spans several pools (a graduated token's bonding curve plus the pool it migrated to). Every money field is a `{sol, usd}` pair fixed at execution (lamports and micro-USD; null = unpriced). A quote-registry mint (SOL, USDC, USDT, USD1) lists the legs whose base it is, keyed by the leg, with no realized PnL. All time params are optional; with none supplied the latest rows are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest rows strictly older than the cursor — no lower bound, so pagination crosses activity gaps).",
+        "description": "Returns the ledger's trade rows filtered by `mint` and/or one-or-more `trader` params (AND-combined; at least one required). `trader` may be repeated (trader=a&trader=b) or comma-separated. `pool` narrows to one or more markets by the trade's primary pool and accepts the same repeated/comma-separated forms, OR-combined — pass the whole set when a token's market spans several pools (a graduated token's bonding curve plus the pool it migrated to). Every money field is a `{sol, usd}` pair fixed at execution (lamports and micro-USD; null = unpriced). A quote-registry mint (SOL or a registered dollar) lists the legs whose base it is, keyed by the leg, with no realized PnL. All time params are optional; with none supplied the latest rows are returned regardless of age. Supports RFC3339 from/to, Unix epoch from_ts/to_ts, and cursor-based before_ts (returns the latest rows strictly older than the cursor — no lower bound, so pagination crosses activity gaps). A page never ends inside a second: when `limit` falls inside a second, the page stops before it and the next page returns it whole, so a page can hold fewer than `limit` rows while older rows remain, and a page that is a single second returns that whole second, up to 5000 rows. Page by passing the oldest returned row's second (`floor(ts_ms / 1000)`) as before_ts until a page comes back empty; no row is skipped or repeated.",
         "parameters": [
           {
             "description": "Mint pubkey (optional; combinable with trader)",
@@ -3297,7 +3307,7 @@
             }
           },
           {
-            "description": "Cursor: return the latest rows strictly before this Unix epoch timestamp (no lower bound)",
+            "description": "Cursor: return the latest rows strictly before this Unix epoch timestamp (no lower bound); pass the oldest returned row's second",
             "in": "query",
             "name": "before_ts",
             "schema": {
@@ -3305,7 +3315,7 @@
             }
           },
           {
-            "description": "Max rows (default 100, max 1000)",
+            "description": "Page size (default 100, max 1000); a page never ends inside a second, so it can hold fewer rows while older ones remain, and a single-second page holds that whole second (up to 5000 rows)",
             "in": "query",
             "name": "limit",
             "schema": {
@@ -4564,10 +4574,10 @@
     },
     "/api/traders/search": {
       "get": {
-        "description": "Fuzzy searches traders by wallet address or known name.",
+        "description": "Finds leaderboard traders by wallet address: a full base58 address matches exactly, anything shorter matches as an address prefix.",
         "parameters": [
           {
-            "description": "Search query",
+            "description": "Wallet address or address prefix",
             "in": "query",
             "name": "q",
             "schema": {
@@ -5990,7 +6000,7 @@
             "type": "integer"
           },
           "med_slot_delta": {
-            "description": "MedSlotDelta is the median signed slot gap (neighbour minus subject), so\na negative value means the neighbour traded first. Real copy-trading\nclusters at 1-2 slots, roughly 0.3-0.6s at current block times, while\ncoincidence scatters over tens of slots. Zero means the SAME block, the\ntightest gap this endpoint can report: the source data carries no\ntransaction index, so which of the two went first inside that block is\nunknown, not absent.",
+            "description": "MedSlotDelta is the median signed slot gap (neighbour minus subject), so\na negative value means the neighbour traded first. Real copy-trading\nclusters at 1-2 slots, while coincidence scatters over tens of slots.\nZero means the SAME block, the\ntightest gap this endpoint can report: the source data carries no\ntransaction index, so which of the two went first inside that block is\nunknown, not absent.",
             "type": "integer"
           },
           "mutual_rate": {
@@ -6247,6 +6257,20 @@
             "description": "the buckets measured on the USD stamps",
             "items": {
               "type": "integer"
+            },
+            "type": "array"
+          },
+          "pnl_sparkline_30d": {
+            "description": "lamports per day, window=30d only",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "pnl_sparkline_30d_usd": {
+            "description": "micro-USD per day, window=30d only",
+            "items": {
+              "type": "number"
             },
             "type": "array"
           },
@@ -7250,6 +7274,9 @@
           "fees_lamports": {
             "type": "integer"
           },
+          "fees_micro_usd": {
+            "type": "integer"
+          },
           "swaps": {
             "type": "integer"
           }
@@ -7259,6 +7286,9 @@
       "pulsight_internal_core_domain_aggregator.MintActivityPoint": {
         "properties": {
           "fees_lamports": {
+            "type": "integer"
+          },
+          "fees_micro_usd": {
             "type": "integer"
           },
           "swaps": {
@@ -7394,7 +7424,7 @@
       "pulsight_internal_core_domain_aggregator.MintMarket": {
         "properties": {
           "base_mint": {
-            "description": "BaseMint is the pool's base side as the aggregator oriented it — the\npage's own mint except on a money mint's page, where the mint may be\nthe quote of the pools listed. BaseSymbol is its symbol, empty when\nunknown.",
+            "description": "BaseMint is the page's own mint, whichever side of the pool the\naggregator filed its legs under. BaseSymbol is its symbol, empty when\nunknown.",
             "type": "string"
           },
           "base_symbol": {
@@ -7417,7 +7447,7 @@
             "type": "integer"
           },
           "quote_mint": {
-            "description": "QuoteMint is the pool's quote side as the aggregator oriented it: a\nregistry quote when one side is one (USDC > USDT > USD1 > WSOL), else\nthe pool's own quote token. This market's native candle prices and\nquote amounts are denominated in it, and the live chart folds only\nticks that carry the same quote.",
+            "description": "QuoteMint is the pool's other side: a registry quote when one side is\none (the registered dollars, USDC first, then WSOL), else the counter\ntoken. This market's native candle prices and quote amounts are\ndenominated in it, and the live chart folds only ticks that carry the\nsame quote.",
             "type": "string"
           },
           "quote_symbol": {
@@ -7432,6 +7462,23 @@
           },
           "swap_count": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintMatchedPool": {
+        "properties": {
+          "address": {
+            "description": "Address is the pool's address.",
+            "type": "string"
+          },
+          "base": {
+            "description": "Base is true when the row's mint is the pool's base token, the side\nthe pool prices; false when it is the pool's quote.",
+            "type": "boolean"
+          },
+          "dex": {
+            "description": "Dex is the pool's venue slug, same vocabulary as `?dex=`.",
+            "type": "string"
           }
         },
         "type": "object"
@@ -7486,7 +7533,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintBundled"
               }
             ],
-            "description": "Bundled/Insiders are the audit-cell cohort flags (absent when not\nnotable). Bundled = the sealed launch bundle cohort; Insiders = the\ncreator distributed supply via launch-window SPL transfers. Both are\nat-a-glance views of the per-mint risk card's cohorts."
+            "description": "Bundled/Insiders are the audit-cell cohort flags (absent when not\nnotable). Bundled = the sealed launch bundle cohort; Insiders = the\ncreator distributed supply via SPL transfers. Both are at-a-glance\nviews of the per-mint risk card's cohorts."
           },
           "buy_count": {
             "type": "integer"
@@ -7499,6 +7546,10 @@
           },
           "dev_holdings": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.DevHoldings"
+          },
+          "dust_float": {
+            "description": "DustFloat reports that the holders' circulating float is under 0.1 % of\ntotal supply: Top10Pct and the insiders' share measure dust, and the\nrisk score's concentration rules did not fire on them.",
+            "type": "boolean"
           },
           "fetch_status": {
             "type": "string"
@@ -7544,6 +7595,14 @@
           },
           "markets_count": {
             "type": "integer"
+          },
+          "matched_pool": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintMatchedPool"
+              }
+            ],
+            "description": "MatchedPool is set only on a `?search=` row the term reached through a\npool address instead of the mint's own address, symbol or name: the row\nis one of that pool's tokens."
           },
           "metadata_uri": {
             "description": "MetadataURI/FetchStatus are detail-only identity fields the\nfrontend's TokenIdentityCard renders (off-chain JSON link + enrich\nstatus). nil on list rows.",
@@ -8236,6 +8295,10 @@
           "dev": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.DevStat"
           },
+          "dust_float": {
+            "description": "DustFloat reports that the holders' circulating float is under 0.1 % of\ntotal supply: Top10 and the cohorts' held shares measure dust, and the\nconcentration rules did not fire on them.",
+            "type": "boolean"
+          },
           "holder_count": {
             "type": "integer"
           },
@@ -8500,9 +8563,6 @@
           "label_type": {
             "type": "string"
           },
-          "late": {
-            "type": "boolean"
-          },
           "mint": {
             "type": "string"
           },
@@ -8520,6 +8580,10 @@
           },
           "primary_pool_id": {
             "type": "integer"
+          },
+          "primary_pool_quote_mint": {
+            "description": "PrimaryPoolQuoteMint is the primary pool's counter asset from this\nmint's side (its quote, or its base when the mint is the quote of a\ntoken-quoted pair) — the rule that decides whether a copy bot can\nexecute there. REST decoration; absent when the catalog does not know\nthe pool.",
+            "type": "string"
           },
           "qty": {
             "type": "string"
@@ -8854,6 +8918,13 @@
           "trader": {
             "type": "string"
           },
+          "uncovered_proceeds_lamports": {
+            "description": "UncoveredProceeds — proceeds of the window's sells of tokens with no\nknown cost (received by transfer, or beyond the recorded buys). Neither\nRealizedProfit nor NetRealizedProfit includes them.",
+            "type": "integer"
+          },
+          "uncovered_proceeds_usd": {
+            "type": "integer"
+          },
           "win_profit": {
             "type": "integer"
           },
@@ -8961,19 +9032,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
-          "3m",
           "1d",
           "7d",
           "30d",
-          "all"
+          "all",
+          "3m"
         ],
         "type": "string",
         "x-enum-varnames": [
-          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll"
+          "WindowAll",
+          "Window3m"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -10236,6 +10307,14 @@
             "description": "CopiesReverted counts copy fills the slippage gate REJECTED: the pool's\nlanding price had drifted past the exec's slippage_bps between the\ntarget's swap and our simulated landing. Unlike CopiesSkippedUnpriced\nthis is an EXECUTION OUTCOME, not a coverage gap — the data was fine,\nthe market moved, and a live bot's tx would have landed and reverted.\nEach revert still pays its tip + priority fee (folded into\nFeesPaidSol/TipsPaidSol and broken out in RevertFeesSol). Only possible\non latency_slots > 0 runs. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
+          "copies_skipped_non_sol_quote": {
+            "description": "CopiesSkippedNonSolQuote is the part of CopiesSkippedUnpriced whose\ncause is the pool's quote: the target swapped in a USDC-, USDT- or\ntoken-quoted pool whose leg carries no SOL price, so the live bot has\nno route to copy it and both sides skip it (`non_sol_quote`). The\nruntime keeps ONE counter for both causes; this breakdown exists only\nhere. Additive JSONB field — old rows decode as 0.",
+            "type": "integer"
+          },
+          "copies_skipped_pool_not_simulated": {
+            "description": "CopiesSkippedPoolNotSimulated counts target swaps a per-pool run saw on a\nmarket it carried no instrument for (outside the mint's top pools, or a\npool the catalog does not know). They fold into the target book and are\nrecorded once as `pool_not_simulated`; nothing fills. A per-pool\nartefact, not in CopiesSkippedUnpriced. Additive JSONB field.",
+            "type": "integer"
+          },
           "copies_skipped_unpriced": {
             "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap could not be priced honestly\n— so they were NOT traded. Two causes, both data-side:\n\n  1. no post-swap price on the leg at all (every Meteora DLMM leg, and\n     every DAMM v2 / DBC leg ingested before those decoders were fixed);\n  2. a leg whose reserve is impossible for a post-swap snapshot, which\n     means it is a PRE-swap one and its price is the pre-swap price\n     (PumpSwap — see postSwapReserveConsistent).\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. Cause 1 makes a launch-sniping\nmirror over historical data skip most of its entries; cause 2 fires on\nexactly the large launch buys such a strategy targets. Surfaced so a\nmostly-skipped run reads as \"not enough data\" instead of quietly looking\nlike a thin strategy — or worse, than being filled at a fictional price\nand looking profitable. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
@@ -10278,6 +10357,14 @@
             "description": "PerPool records whether the run simulated each market as an INDEPENDENT\ninstrument (req.PerPool). It is persisted because it is the LEDGER\nBOUNDARY, and a reader cannot recover it from the trades: per-pool\nfidelity stamps every fill with the pool it priced against in EVERY mode,\nso a token that graduates mid-window (bonding curve → PumpSwap) carries\ntwo pools on ONE merged ledger and looks exactly like two independent\ninstruments. The result page's per-token rollup used to guess from that\nstamp and split a graduating token in two — the buys on a row reading\n0.000, the realizing sells and all of the profit on another. Additive\nJSONB field; pre-existing rows decode as false, which is what all but an\nopt-in run was.",
             "type": "boolean"
           },
+          "platform_fee_bps": {
+            "description": "PlatformFeeBps is the platform fee rate the run charged: the account's\nrate when the run was submitted.",
+            "type": "integer"
+          },
+          "platform_fees_paid_sol": {
+            "description": "PlatformFeesPaidSol is the platform fee paid across every fill, folded\nout of realized PnL like priority fees and tips.",
+            "type": "number"
+          },
           "positions_opened_unmarked": {
             "description": "PositionsOpenedUnmarked counts positions the run opened while it had NO\nprice to mark them with — so for as long as that lasted, every\nprice-based exit rule (take-profit, stop, trailing stop, max-drawdown)\nevaluated as undefined and could not fire.\n\nIt happens because a copy fills at the price the TARGET left behind, on\nthe pool THEY traded, while the position is marked against the run's own\ncandle stream. Normally those are the same market. They are not when the\nfill lands somewhere the stream does not cover — a parallel venue, or a\nmarket whose candles simply have not started yet.\n\nLike CopiesSkippedUnpriced this is a COVERAGE number, not a result: an\nexit rule that could not be evaluated did not decline to fire, it never\nran, and the position rode on until something else closed it. A non-zero\nvalue means the run UNDER-represents its own exit rules — read the ROI\nwith that in mind.\n\nMid-window graduations used to dominate this and no longer do: the\ncandle stream now merges a token's whole migration lineage, so a\nbonding-curve entry is marked from the moment it opens. Additive JSONB\nfield — old rows decode as 0.",
             "type": "integer"
@@ -10317,6 +10404,10 @@
           "trades": {
             "type": "integer"
           },
+          "transfer_fees_paid_sol": {
+            "description": "TransferFeesPaidSol is the SOL value Token-2022 transfer fees took across\nevery fill; it is already inside the fill prices, so it is not folded again.",
+            "type": "number"
+          },
           "unrealized_pnl_sol": {
             "type": "number"
           },
@@ -10344,6 +10435,10 @@
           "mint": {
             "type": "string"
           },
+          "platform_fee_sol": {
+            "description": "PlatformFeeSol is the platform fee this fill pays, in SOL.",
+            "type": "number"
+          },
           "pool": {
             "description": "Pool is the AMM market this trade executed in. For a COPY trade it's the\npool the mirrored target actually swapped in (per-leg dex_swaps); for an\nEMIT trade it's the run's pinned pool (SingleMint pin) or nil when the\nrun resolved the mint's dominant pool (whose identity isn't surfaced).",
             "type": "string"
@@ -10370,6 +10465,10 @@
           "source": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TradeSource"
           },
+          "swap_fee_bps": {
+            "description": "SwapFeeBps is the venue swap fee this fill paid, in basis points.",
+            "type": "integer"
+          },
           "target_price_impact_pct": {
             "description": "TargetPriceImpactPct is the MIRRORED trader's own price impact on the\nswap we copied — set on copy trades triggered by a target swap, measured\nagainst the reconstructed pre-swap reserve. It describes THEIR fill, so\nit is reported the same under a landing-latency run; it is never folded\ninto our own price. Nil for candle-driven emit trades.",
             "type": "number"
@@ -10378,6 +10477,10 @@
             "type": "number"
           },
           "token_amount": {
+            "type": "number"
+          },
+          "transfer_fee_sol": {
+            "description": "TransferFeeSol is the SOL value the token's Token-2022 transfer fee took\nfrom this fill.",
             "type": "number"
           },
           "triggering_swap_sig": {
@@ -10393,6 +10496,8 @@
         "enum": [
           "cooldown",
           "unpriced",
+          "non_sol_quote",
+          "pool_not_simulated",
           "zero_size",
           "size_out_of_range",
           "max_buys_per_position",
@@ -10406,6 +10511,8 @@
         "x-enum-varnames": [
           "DeclineCooldown",
           "DeclineUnpriced",
+          "DeclineNonSolQuote",
+          "DeclinePoolNotSimulated",
           "DeclineZeroSize",
           "DeclineSizeOutOfRange",
           "DeclineMaxBuysPerPosition",
@@ -10472,6 +10579,29 @@
               "type": "string"
             },
             "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.PreviewSkip"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_usecases_backtest.PreviewSkip": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.DeclineReason"
+          },
+          "side": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.Side"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -10885,7 +11015,7 @@
             "type": "number"
           },
           "holding_pnl_usd": {
-            "description": "HoldingPnlUsd, PnlDistributionUsd and PnlSparkline7dUsd are the USD\ntwins of the three snapshot figures below (micro-USD, stamped at\nexecution), and TraderUsd carries the twin of every windowed money\nfigure on the row.",
+            "description": "HoldingPnlUsd, PnlDistributionUsd, PnlSparkline7dUsd and\nPnlSparkline30dUsd are the USD twins of the four snapshot figures below\n(micro-USD, stamped at execution), and TraderUsd carries the twin of\nevery windowed money figure on the row.",
             "type": "number"
           },
           "id": {
@@ -11004,8 +11134,21 @@
             },
             "type": "array"
           },
+          "pnl_sparkline_30d": {
+            "description": "PnlSparkline30d is the net-PnL series over the last 30 UTC days,\none point per day, oldest first, in lamports per day. Only a 30d page\ncarries it.",
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "pnl_sparkline_30d_usd": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          },
           "pnl_sparkline_7d": {
-            "description": "PnlSparkline7d is the 7-day realised-PnL series, oldest first,\nexpressed in lamports per day on the wire (the FormattedSol\ncontract). Nil when the snapshot wasn't inlined.",
+            "description": "PnlSparkline7d is the 7-day net-PnL series (NetProfit7d's measure,\none point per UTC day), oldest first, expressed in lamports per day\non the wire (the FormattedSol contract). Nil when the snapshot wasn't\ninlined.",
             "items": {
               "type": "number"
             },
