@@ -895,6 +895,22 @@
             }
           },
           {
+            "description": "Min LIFETIME network fees per lifetime trade, whole units of `unit` — total_fees over total_tx_count.",
+            "in": "query",
+            "name": "min_fee_per_swap",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Min share of the mint's trades whose transaction paid a landing tip, in percent — the row's tipped_share_pct. Mints without it are excluded.",
+            "in": "query",
+            "name": "min_tipped_share",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
             "description": "Only mints first seen within the last N seconds (launched < N ago). Mints with no observed first_seen are excluded.",
             "in": "query",
             "name": "max_age_secs",
@@ -7657,6 +7673,10 @@
           },
           "symbol": {
             "type": "string"
+          },
+          "tipped_share_pct": {
+            "description": "TippedSharePct — share of the mint's trades whose transaction paid a\nlanding tip, in percent, over every trade since tips were recorded and\narbitrage excluded. nil until 20 such trades.",
+            "type": "number"
           },
           "top10_pct": {
             "description": "Top10Pct is the top-10 holder concentration as a PERCENT of circulating\nsupply (0..100), off the mint's holder-stats plane — the figure the\nlisting's Distribution column leads with. nil until the plane has\nfolded the mint's holders.",
