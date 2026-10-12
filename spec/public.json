@@ -123,7 +123,7 @@
     },
     "/api/backtests/limits": {
       "get": {
-        "description": "Returns the per-run backtest cost ceiling (max credits per run) and the per-timeframe maximum run window in seconds, so clients can show and pre-check them. An absent timeframe is unlimited; admins are exempt.",
+        "description": "Returns the per-run backtest cost ceiling (max credits per run) and the per-timeframe maximum run window in seconds, so clients can show and pre-check them. An absent timeframe is unlimited.",
         "responses": {
           "200": {
             "description": "OK",
@@ -2420,7 +2420,7 @@
     },
     "/api/programs/leaderboard": {
       "get": {
-        "description": "On-chain programs ranked over a window: volume (SOL-projected; venue-executed for AMM-category programs, tx-level otherwise), unique users, revenue (category-gated: net arb extraction for arbitrage programs, decoded venue fees for AMMs, 0 = not measured for routers/unknowns), landed tx count, success / spam / non-swap rates, and a resolved category (admin identity > curated AMM seed > 7d arb-share auto-rule > unknown). Numeric filters are flat query params; SOL values in whole SOL, rates in percent.",
+        "description": "On-chain programs ranked over a window: volume (SOL-projected; venue-executed for AMM-category programs, tx-level otherwise), unique users, revenue (category-gated: net arb extraction for arbitrage programs, decoded venue fees for AMMs, 0 = not measured for routers/unknowns), landed tx count, success / spam / non-swap rates, and a resolved category (assigned identity > curated AMM seed > 7d arb-share auto-rule > unknown). Numeric filters are flat query params; SOL values in whole SOL, rates in percent.",
         "parameters": [
           {
             "description": "arbitrage|amm|router|unknown|all (default arbitrage; router = router/aggregator programs; unknown = none of the other three)",
@@ -6626,7 +6626,7 @@
             "type": "number"
           },
           "label": {
-            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\") from the\nadmin-managed registry; empty when unknown. Same provenance as\nHolderEntry.Label.",
+            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\") from the\nknown-addresses registry; empty when unknown. Same provenance as\nHolderEntry.Label.",
             "type": "string"
           },
           "label_type": {
@@ -7143,7 +7143,7 @@
             "type": "boolean"
           },
           "label": {
-            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\",\n\"Pump.fun Fees\"/\"fee\") from the admin-managed registry; empty when\nunknown.",
+            "description": "Label/LabelType identify a known wallet (e.g. \"Bybit\"/\"cex\",\n\"Pump.fun Fees\"/\"fee\") from the known-addresses registry; empty when\nunknown.",
             "type": "string"
           },
           "label_type": {
@@ -7812,7 +7812,7 @@
             "type": "boolean"
           },
           "label": {
-            "description": "Label/LabelType identify a known wallet (CEX/fee/...) from the\nadmin-managed registry; empty when unknown.",
+            "description": "Label/LabelType identify a known wallet (CEX/fee/...) from the\nknown-addresses registry; empty when unknown.",
             "type": "string"
           },
           "label_type": {
@@ -8011,7 +8011,7 @@
             "type": "integer"
           },
           "category": {
-            "description": "Category is the RESOLVED category: admin identity > embedded\nprogram seed > 7d auto-arb rule > \"unknown\".",
+            "description": "Category is the RESOLVED category: assigned identity > embedded\nprogram seed > 7d auto-arb rule > \"unknown\".",
             "type": "string"
           },
           "censored": {
@@ -8023,19 +8023,15 @@
           "first_seen_ms": {
             "type": "integer"
           },
-          "hidden": {
-            "description": "Hidden mirrors the admin identity's hide flag. Hidden rows never\nreach the public board (dropped before ranking) — only the admin\nlisting serves them.",
-            "type": "boolean"
-          },
           "last_seen_ms": {
             "type": "integer"
           },
           "logo_uri": {
-            "description": "LogoURI is the admin-assigned identity logo, falling back to the\nembedded seed's self-hosted mirror path (/program-logos/…); empty\nwhen the program has none.",
+            "description": "LogoURI is the program's assigned identity logo, falling back to the\nembedded seed's self-hosted mirror path (/program-logos/…); empty\nwhen the program has none.",
             "type": "string"
           },
           "name": {
-            "description": "Name is the admin-assigned identity name, falling back to the\nembedded seed name; empty when unnamed.",
+            "description": "Name is the program's assigned identity name, falling back to the\nembedded seed name; empty when unnamed.",
             "type": "string"
           },
           "non_swap_rate": {
@@ -9052,19 +9048,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -9096,7 +9092,7 @@
       "pulsight_internal_core_domain_credit.Transaction": {
         "properties": {
           "api_key_id": {
-            "description": "APIKeyID attributes a metered consume to the api token that caused\nit. nil for interactive sessions, OAuth callers, admin adjustments\nand period grants — and for every row written before changeset 079.",
+            "description": "APIKeyID attributes a metered consume to the api token that caused\nit. nil for interactive sessions, OAuth callers, manual adjustments\nand period grants — and for every row written before changeset 079.",
             "type": "string"
           },
           "created_at": {
@@ -9988,7 +9984,7 @@
             "type": "integer"
           },
           "max_strategies": {
-            "description": "MaxStrategies is the strategy cap, 0 meaning UNLIMITED (see\nsubscription.PlanLimits.MaxStrategies). It carries the admin's\n`tier_plan_limits` override, not the compiled-in default.",
+            "description": "MaxStrategies is the strategy cap, 0 meaning UNLIMITED (see\nsubscription.PlanLimits.MaxStrategies). It carries the per-tier\n`tier_plan_limits` override, not the compiled-in default.",
             "type": "integer"
           },
           "max_webhooks": {
@@ -10079,7 +10075,7 @@
             "type": "integer"
           },
           "gifted": {
-            "description": "Gifted is the persistent admin-gift reserve still available. It is\nspent down before the cycle allowance and survives tier changes.\nCycle tier balance remaining = Balance − Gifted.",
+            "description": "Gifted is the persistent gifted reserve still available. It is\nspent down before the cycle allowance and survives tier changes.\nCycle tier balance remaining = Balance − Gifted.",
             "type": "integer"
           },
           "period_end": {
