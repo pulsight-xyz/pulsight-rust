@@ -8598,7 +8598,7 @@
             "type": "integer"
           },
           "primary_pool_quote_mint": {
-            "description": "PrimaryPoolQuoteMint is the primary pool's counter asset from this\nmint's side (its quote, or its base when the mint is the quote of a\ntoken-quoted pair) — the rule that decides whether a copy bot can\nexecute there. REST decoration; absent when the catalog does not know\nthe pool.",
+            "description": "PrimaryPoolQuoteMint is the primary pool's counter asset from this\nmint's side (its quote, or its base when the mint is the quote of a\ntoken-quoted pair) — the rule that decides whether a copy can\nexecute there. REST decoration; absent when the catalog does not know\nthe pool.",
             "type": "string"
           },
           "qty": {
@@ -9048,19 +9048,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
-          "3m",
           "1d",
           "7d",
           "30d",
-          "all"
+          "all",
+          "3m"
         ],
         "type": "string",
         "x-enum-varnames": [
-          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll"
+          "WindowAll",
+          "Window3m"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -10259,7 +10259,7 @@
       "pulsight_internal_core_usecases_backtest.BacktestRequest": {
         "properties": {
           "latency_slots": {
-            "description": "LatencySlots is the copy-fill landing latency in slots (blocks),\n0..MaxLatencySlots. 0 (default) keeps the zero-latency model: a copy\nfills at the target's own post-swap price with slippage charged as a\nflat haircut. 1..3 fills at the pool's EMPIRICAL resting price that many\nslots after the target's swap, and the exec's slippage_bps becomes a\nREVERT GATE instead of a charge — the fill is rejected (tip + priority\nfee still paid) when the landing price drifted past the tolerance,\nmatching how the live executor's min_out floor behaves. Only copy-style\nfills (Copy* and Target-signal-driven Emits) are affected; candle-driven\nfills already price on the bucket close.",
+            "description": "LatencySlots is the copy-fill landing latency in slots (blocks),\n0..MaxLatencySlots. 0 (default) keeps the zero-latency model: a copy\nfills at the target's own post-swap price with slippage charged as a\nflat haircut. 1..3 fills at the pool's EMPIRICAL resting price that many\nslots after the target's swap, and the exec's slippage_bps becomes a\nREVERT GATE instead of a charge — the fill is rejected (tip + priority\nfee still paid) when the landing price drifted past the tolerance,\nmatching how a transaction's min_out floor behaves. Only copy-style\nfills (Copy* and Target-signal-driven Emits) are affected; candle-driven\nfills already price on the bucket close.",
             "type": "integer"
           },
           "per_pool": {
@@ -10320,11 +10320,11 @@
             "type": "integer"
           },
           "copies_reverted": {
-            "description": "CopiesReverted counts copy fills the slippage gate REJECTED: the pool's\nlanding price had drifted past the exec's slippage_bps between the\ntarget's swap and our simulated landing. Unlike CopiesSkippedUnpriced\nthis is an EXECUTION OUTCOME, not a coverage gap — the data was fine,\nthe market moved, and a live bot's tx would have landed and reverted.\nEach revert still pays its tip + priority fee (folded into\nFeesPaidSol/TipsPaidSol and broken out in RevertFeesSol). Only possible\non latency_slots > 0 runs. Additive JSONB field — old rows decode as 0.",
+            "description": "CopiesReverted counts copy fills the slippage gate REJECTED: the pool's\nlanding price had drifted past the exec's slippage_bps between the\ntarget's swap and our simulated landing. Unlike CopiesSkippedUnpriced\nthis is an EXECUTION OUTCOME, not a coverage gap — the data was fine,\nthe market moved, and a real transaction would have landed and reverted.\nEach revert still pays its tip + priority fee (folded into\nFeesPaidSol/TipsPaidSol and broken out in RevertFeesSol). Only possible\non latency_slots > 0 runs. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "copies_skipped_non_sol_quote": {
-            "description": "CopiesSkippedNonSolQuote is the part of CopiesSkippedUnpriced whose\ncause is the pool's quote: the target swapped in a USDC-, USDT- or\ntoken-quoted pool whose leg carries no SOL price, so the live bot has\nno route to copy it and both sides skip it (`non_sol_quote`). The\nruntime keeps ONE counter for both causes; this breakdown exists only\nhere. Additive JSONB field — old rows decode as 0.",
+            "description": "CopiesSkippedNonSolQuote is the part of CopiesSkippedUnpriced whose\ncause is the pool's quote: the target swapped in a USDC-, USDT- or\ntoken-quoted pool whose leg carries no SOL price, so there is no route\nto copy it and the run skips it (`non_sol_quote`). Additive JSONB\nfield — old rows decode as 0.",
             "type": "integer"
           },
           "copies_skipped_pool_not_simulated": {
@@ -10349,7 +10349,7 @@
             "type": "array"
           },
           "landing_contested_pct": {
-            "description": "LandingContestedPct is the share (0-100) of filled copies whose pool saw\nat least one other tx inside the latency gap — how often somebody beat\nthe bot to the pool. Nil when the run had no landing fills.",
+            "description": "LandingContestedPct is the share (0-100) of filled copies whose pool saw\nat least one other tx inside the latency gap — how often somebody\nreached the pool first. Nil when the run had no landing fills.",
             "type": "number"
           },
           "latency_slots": {
