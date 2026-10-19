@@ -1080,7 +1080,7 @@
     },
     "/api/mints/{pubkey}/activity": {
       "get": {
-        "description": "Returns the mint's per-minute swap count + network fees (tx fee + MEV tip, in lamports and in micro-USD as stamped at execution) over [from, to), plus the lifetime totals strictly before `from`. Range capped at 25 hours.",
+        "description": "Returns the mint's per-minute swap count + network fees (tx fee + MEV tip, in lamports and in micro-USD as stamped at execution) over [from, to), plus the lifetime totals strictly before `from`. Range capped at 25 hours. `fields` opts into more: `tips` (the tipped-share counts per minute and before the range), `traders` (each minute's trading wallets as packed keys), `trader_base` (the keys of every wallet that traded before the range) and `launch` (the sealed launch bundle and the first trade); the response's `fields` names what it carries.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -1107,6 +1107,14 @@
             "required": true,
             "schema": {
               "type": "integer"
+            }
+          },
+          {
+            "description": "Opt-in parts, comma-separated: tips, traders, trader_base, launch",
+            "in": "query",
+            "name": "fields",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -3396,8 +3404,51 @@
         "operationId": "getSwaps"
       }
     },
+    "/api/tips/adoption": {
+      "get": {
+        "description": "The share of landed transactions and of traded value that paid a tip, per bucket of at least an hour (at most about 180 buckets), with the counts and volumes in both currencies behind each share. A share is null where its denominator is zero; the last bucket is still filling.",
+        "parameters": [
+          {
+            "description": "Window (30m|1h|12h|1d|7d|30d|all)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipAdoption"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tip adoption series",
+        "tags": [
+          "Tips"
+        ],
+        "operationId": "getTipsAdoption"
+      }
+    },
     "/api/tips/global": {
       "get": {
+        "description": "The window's tipped transactions, tips and priority fees in both currencies, the median, 90th and 99th percentile tip, and the share of landed transactions and traded value that tipped; `previous` carries the same figures over the window of equal length before it (absent for `all` and when the ledger does not cover it). `all` is the last 90 days.",
         "parameters": [
           {
             "description": "Window (30m|1h|12h|1d|7d|30d|all)",
@@ -3437,57 +3488,9 @@
         "operationId": "getTipsGlobal"
       }
     },
-    "/api/tips/heatmap": {
+    "/api/tips/series": {
       "get": {
-        "parameters": [
-          {
-            "description": "Bucket (1m|5m|10m)",
-            "in": "query",
-            "name": "bucket",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Horizon hours (1..24)",
-            "in": "query",
-            "name": "horizon_hours",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.HeatmapResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Tip heatmap",
-        "tags": [
-          "Tips"
-        ],
-        "operationId": "getTipsHeatmap"
-      }
-    },
-    "/api/tips/mat": {
-      "get": {
+        "description": "The window's tip figures per bucket (60 s up to 4 h, or a day for the 90-day window; at most 180 buckets): tipped transactions, tips and priority fees in both currencies, and the median, 90th and 99th percentile tip. Buckets without a tipped transaction are absent; the last bucket is still filling.",
         "parameters": [
           {
             "description": "Window (30m|1h|12h|1d|7d|30d|all)",
@@ -3504,10 +3507,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MatPoint"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipSeries"
                 }
               }
             }
@@ -3523,103 +3523,16 @@
             }
           }
         },
-        "summary": "Tip moving-average series",
+        "summary": "Tip series",
         "tags": [
           "Tips"
         ],
-        "operationId": "getTipsMat"
-      }
-    },
-    "/api/tips/mev-share": {
-      "get": {
-        "parameters": [
-          {
-            "description": "Window (30m|1h|12h|1d|7d|30d|all)",
-            "in": "query",
-            "name": "window",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MevTipSharePoint"
-                  },
-                  "type": "array"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Tipped-volume share series",
-        "tags": [
-          "Tips"
-        ],
-        "operationId": "getTipsMevShare"
-      }
-    },
-    "/api/tips/priority-ratio": {
-      "get": {
-        "parameters": [
-          {
-            "description": "Window (30m|1h|12h|1d|7d|30d|all)",
-            "in": "query",
-            "name": "window",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipPriorityRatioPoint"
-                  },
-                  "type": "array"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Tip vs priority-fee ratio series",
-        "tags": [
-          "Tips"
-        ],
-        "operationId": "getTipsPriorityRatio"
+        "operationId": "getTipsSeries"
       }
     },
     "/api/tips/services": {
       "get": {
+        "description": "Every tip service with a tipped transaction in the window, by tipped transactions descending: its share of the tipped transactions and of the tips paid, the tips in both currencies, the mean, median and 90th percentile tip, and `prev_share_pct`, its share over the window of equal length before (null for `all` and when the ledger does not cover it).",
         "parameters": [
           {
             "description": "Window (30m|1h|12h|1d|7d|30d|all)",
@@ -3660,6 +3573,48 @@
           "Tips"
         ],
         "operationId": "getTipsServices"
+      }
+    },
+    "/api/tips/services/series": {
+      "get": {
+        "description": "Each tip service's tipped transactions per bucket over the window, on the bucket grid of /api/tips/series: `buckets` lists every bucket start and each service's counts align with it, zero-filled. Services are ordered by the window's tipped transactions, descending.",
+        "parameters": [
+          {
+            "description": "Window (30m|1h|12h|1d|7d|30d|all)",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipServiceSeries"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tip service series",
+        "tags": [
+          "Tips"
+        ],
+        "operationId": "getTipsServicesSeries"
       }
     },
     "/api/token-filters/": {
@@ -7080,49 +7035,76 @@
       "pulsight_internal_core_domain_aggregator.GlobalTipStats": {
         "properties": {
           "p50_tip_lamports": {
+            "description": "P50TipLamports, P90TipLamports and P99TipLamports are the median, 90th\nand 99th percentile tip (t-digest estimates). Lamports only: there is no\nUSD twin of a percentile.",
             "type": "number"
           },
           "p90_tip_lamports": {
             "type": "number"
           },
+          "p99_tip_lamports": {
+            "type": "number"
+          },
+          "previous": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipPeriodStats"
+              }
+            ],
+            "description": "Previous holds the same figures over the window of equal length just\nbefore this one. Omitted for `all`, and when the ledger does not cover\nthat window."
+          },
           "priority_fee_sum": {
+            "description": "PriorityFeeSum is the priority fees the tipped transactions paid\nalongside their tips, in lamports.",
+            "type": "integer"
+          },
+          "priority_fee_sum_usd": {
             "type": "integer"
           },
           "swap_count": {
+            "description": "SwapCount is every landed transaction of the period, tipped or not,\nread off the hourly program plane with each hour weighted by its\noverlap with the period.",
             "type": "integer"
           },
           "tip_avg_lamports": {
+            "description": "TipAvgLamports is the mean tip per tipped transaction.",
+            "type": "number"
+          },
+          "tip_avg_usd": {
             "type": "number"
           },
           "tip_count": {
+            "description": "TipCount is the number of tipped transactions.",
             "type": "integer"
           },
           "tip_sum_lamports": {
+            "description": "TipSumLamports is the tips those transactions paid.",
+            "type": "integer"
+          },
+          "tip_sum_usd": {
             "type": "integer"
           },
           "tipped_fraction": {
-            "description": "TippedFraction is tip_count / swap_count over the window (0..1).",
+            "description": "TippedFraction is tip_count / swap_count (0..1).",
             "type": "number"
+          },
+          "tipped_volume_fraction": {
+            "description": "TippedVolumeFraction is tipped_volume_lamports / total_volume_lamports\n(0..1).",
+            "type": "number"
+          },
+          "tipped_volume_lamports": {
+            "description": "TippedVolumeLamports is the value the tipped transactions traded.",
+            "type": "integer"
+          },
+          "tipped_volume_usd": {
+            "type": "integer"
+          },
+          "total_volume_lamports": {
+            "description": "TotalVolumeLamports is the value every landed transaction traded,\nweighted like SwapCount.",
+            "type": "integer"
+          },
+          "total_volume_usd": {
+            "type": "integer"
           },
           "window": {
             "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_domain_aggregator.HeatmapResponse": {
-        "properties": {
-          "bucket": {
-            "type": "string"
-          },
-          "horizon_hours": {
-            "type": "integer"
-          },
-          "points": {
-            "items": {
-              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipHeatmapPoint"
-            },
-            "type": "array"
           }
         },
         "type": "object"
@@ -7251,40 +7233,6 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_aggregator.MatPoint": {
-        "properties": {
-          "bucket_ts": {
-            "type": "integer"
-          },
-          "ma_1h": {
-            "type": "number"
-          },
-          "ma_5m": {
-            "type": "number"
-          },
-          "tip_avg": {
-            "type": "number"
-          }
-        },
-        "type": "object"
-      },
-      "pulsight_internal_core_domain_aggregator.MevTipSharePoint": {
-        "properties": {
-          "bucket_ts": {
-            "type": "integer"
-          },
-          "share_pct": {
-            "type": "number"
-          },
-          "tipped_volume_lamports": {
-            "type": "integer"
-          },
-          "total_volume_lamports": {
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "pulsight_internal_core_domain_aggregator.MintActivityBase": {
         "properties": {
           "fees_lamports": {
@@ -7295,6 +7243,19 @@
           },
           "swaps": {
             "type": "integer"
+          },
+          "tip_trades": {
+            "description": "TipTrades is a point's tip_trades over everything before the range.\nServed with the `tips` field.",
+            "type": "integer"
+          },
+          "tipped_trades": {
+            "description": "TippedTrades is a point's tipped_trades over everything before the\nrange. Served with the `tips` field.",
+            "type": "integer"
+          },
+          "traders": {
+            "description": "Traders packs the key of every wallet with a buy or sell row before the\nrange, as a point's traders. Served with the `trader_base` field.",
+            "format": "byte",
+            "type": "string"
           }
         },
         "type": "object"
@@ -7310,6 +7271,19 @@
           "swaps": {
             "type": "integer"
           },
+          "tip_trades": {
+            "description": "TipTrades counts the bucket's buy and sell rows, arbitrage excluded,\nwhose transaction's landing tip was recorded — the denominator of the\ntoken page's tipped share. Served with the `tips` field.",
+            "type": "integer"
+          },
+          "tipped_trades": {
+            "description": "TippedTrades counts those of them whose transaction paid a landing\ntip. Served with the `tips` field.",
+            "type": "integer"
+          },
+          "traders": {
+            "description": "Traders packs one key per wallet with a buy or sell row in the bucket:\nClickHouse cityHash64 of the wallet's 32 bytes, 8 bytes little-endian\neach, base64-encoded. Served with the `traders` field.",
+            "format": "byte",
+            "type": "string"
+          },
           "ts": {
             "type": "integer"
           }
@@ -7321,8 +7295,27 @@
           "base": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintActivityBase"
           },
+          "fields": {
+            "description": "Fields names the opt-in parts the response carries, in the request's\nvocabulary.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "first_trade_ts": {
+            "description": "FirstTradeTS is the mint's first trade, unix seconds, absent when it\nhas none. Served with the `launch` field.",
+            "type": "integer"
+          },
           "from": {
             "type": "integer"
+          },
+          "launch": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.MintLaunchBundle"
+              }
+            ],
+            "description": "Launch is the mint's sealed launch bundle, absent until it is sealed.\nServed with the `launch` field."
           },
           "mint": {
             "type": "string"
@@ -7403,6 +7396,19 @@
           },
           "wallets": {
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.MintLaunchBundle": {
+        "properties": {
+          "measured_at": {
+            "description": "MeasuredAt is when the bundle became measurable, unix seconds: 302 s\nafter the mint's first trade, when its seal falls due.",
+            "type": "integer"
+          },
+          "pct": {
+            "description": "Pct is the share of supply the launch bundle took, in percent — the\nrisk card's bundled at launch.",
+            "type": "number"
           }
         },
         "type": "object"
@@ -8423,13 +8429,39 @@
       },
       "pulsight_internal_core_domain_aggregator.ServiceDominanceRow": {
         "properties": {
+          "p50_tip_lamports": {
+            "description": "P50TipLamports and P90TipLamports are the median and 90th percentile\ntip paid to this service.",
+            "type": "number"
+          },
+          "p90_tip_lamports": {
+            "type": "number"
+          },
+          "prev_share_pct": {
+            "description": "PrevSharePct is SharePct over the window of equal length just before\nthis one: 0 for a service absent from it, null for `all` and when the\nledger does not cover it.",
+            "type": "number"
+          },
           "share_pct": {
+            "type": "number"
+          },
+          "tip_avg_lamports": {
+            "description": "TipAvgLamports is the mean tip per tipped transaction.",
+            "type": "number"
+          },
+          "tip_avg_usd": {
             "type": "number"
           },
           "tip_service": {
             "type": "string"
           },
+          "tip_share_pct": {
+            "description": "TipSharePct is this service's share of the tips paid in the window\n(0..100).",
+            "type": "number"
+          },
           "tip_sum_lamports": {
+            "type": "integer"
+          },
+          "tip_sum_usd": {
+            "description": "TipSumUsd is TipSumLamports on the transactions' USD stamps\n(micro-USD).",
             "type": "integer"
           },
           "tipped_count": {
@@ -8473,17 +8505,192 @@
           "Timeframe24h"
         ]
       },
-      "pulsight_internal_core_domain_aggregator.TipHeatmapPoint": {
+      "pulsight_internal_core_domain_aggregator.TipAdoption": {
         "properties": {
-          "bucket_ts": {
-            "description": "unix epoch seconds at bucket start",
+          "bucket_secs": {
+            "description": "BucketSecs is the bucket width in seconds, a whole number of hours;\nbuckets start on multiples of it since the Unix epoch.",
             "type": "integer"
           },
-          "median_tip_lamports": {
+          "from": {
+            "description": "From is the first bucket's start (unix seconds).",
+            "type": "integer"
+          },
+          "points": {
+            "description": "Points is ascending; a bucket with neither tipped nor landed\ntransactions is absent.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipAdoptionPoint"
+            },
+            "type": "array"
+          },
+          "to": {
+            "description": "To is the read time (unix seconds); the bucket containing it is still\nfilling.",
+            "type": "integer"
+          },
+          "window": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TipAdoptionPoint": {
+        "properties": {
+          "bucket_ts": {
+            "description": "BucketTS is the bucket start, unix seconds.",
+            "type": "integer"
+          },
+          "landed_count": {
+            "description": "LandedCount is the bucket's landed transactions, tipped or not.",
+            "type": "integer"
+          },
+          "tipped_count": {
+            "description": "TippedCount is the bucket's tipped transactions.",
+            "type": "integer"
+          },
+          "tipped_volume_lamports": {
+            "description": "TippedVolumeLamports is the value the tipped transactions traded.",
+            "type": "integer"
+          },
+          "tipped_volume_usd": {
+            "type": "integer"
+          },
+          "total_volume_lamports": {
+            "description": "TotalVolumeLamports is the value every landed transaction traded.",
+            "type": "integer"
+          },
+          "total_volume_usd": {
+            "type": "integer"
+          },
+          "tx_share": {
+            "description": "TxShare is tipped_count / landed_count (0..1), null when nothing\nlanded.",
+            "type": "number"
+          },
+          "volume_share": {
+            "description": "VolumeShare is tipped_volume_lamports / total_volume_lamports (0..1),\nnull when nothing traded.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TipPeriodStats": {
+        "properties": {
+          "p50_tip_lamports": {
+            "description": "P50TipLamports, P90TipLamports and P99TipLamports are the median, 90th\nand 99th percentile tip (t-digest estimates). Lamports only: there is no\nUSD twin of a percentile.",
             "type": "number"
           },
           "p90_tip_lamports": {
             "type": "number"
+          },
+          "p99_tip_lamports": {
+            "type": "number"
+          },
+          "priority_fee_sum": {
+            "description": "PriorityFeeSum is the priority fees the tipped transactions paid\nalongside their tips, in lamports.",
+            "type": "integer"
+          },
+          "priority_fee_sum_usd": {
+            "type": "integer"
+          },
+          "swap_count": {
+            "description": "SwapCount is every landed transaction of the period, tipped or not,\nread off the hourly program plane with each hour weighted by its\noverlap with the period.",
+            "type": "integer"
+          },
+          "tip_avg_lamports": {
+            "description": "TipAvgLamports is the mean tip per tipped transaction.",
+            "type": "number"
+          },
+          "tip_avg_usd": {
+            "type": "number"
+          },
+          "tip_count": {
+            "description": "TipCount is the number of tipped transactions.",
+            "type": "integer"
+          },
+          "tip_sum_lamports": {
+            "description": "TipSumLamports is the tips those transactions paid.",
+            "type": "integer"
+          },
+          "tip_sum_usd": {
+            "type": "integer"
+          },
+          "tipped_fraction": {
+            "description": "TippedFraction is tip_count / swap_count (0..1).",
+            "type": "number"
+          },
+          "tipped_volume_fraction": {
+            "description": "TippedVolumeFraction is tipped_volume_lamports / total_volume_lamports\n(0..1).",
+            "type": "number"
+          },
+          "tipped_volume_lamports": {
+            "description": "TippedVolumeLamports is the value the tipped transactions traded.",
+            "type": "integer"
+          },
+          "tipped_volume_usd": {
+            "type": "integer"
+          },
+          "total_volume_lamports": {
+            "description": "TotalVolumeLamports is the value every landed transaction traded,\nweighted like SwapCount.",
+            "type": "integer"
+          },
+          "total_volume_usd": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TipSeries": {
+        "properties": {
+          "bucket_secs": {
+            "description": "BucketSecs is the bucket width in seconds; buckets start on multiples\nof it since the Unix epoch.",
+            "type": "integer"
+          },
+          "from": {
+            "description": "From is the first bucket's start (unix seconds): the window start\nrounded down to a bucket.",
+            "type": "integer"
+          },
+          "points": {
+            "description": "Points holds the buckets with at least one tipped transaction, oldest\nfirst; a bucket without one is absent rather than zero.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipSeriesPoint"
+            },
+            "type": "array"
+          },
+          "to": {
+            "description": "To is the read time (unix seconds); the bucket containing it is still\nfilling.",
+            "type": "integer"
+          },
+          "window": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TipSeriesPoint": {
+        "properties": {
+          "bucket_ts": {
+            "description": "BucketTS is the bucket start, unix seconds.",
+            "type": "integer"
+          },
+          "p50_tip_lamports": {
+            "description": "P50TipLamports, P90TipLamports and P99TipLamports are the bucket's\nmedian, 90th and 99th percentile tip.",
+            "type": "number"
+          },
+          "p90_tip_lamports": {
+            "type": "number"
+          },
+          "p99_tip_lamports": {
+            "type": "number"
+          },
+          "priority_fee_sum": {
+            "type": "integer"
+          },
+          "priority_fee_sum_usd": {
+            "type": "integer"
+          },
+          "tip_sum_lamports": {
+            "type": "integer"
+          },
+          "tip_sum_usd": {
+            "type": "integer"
           },
           "tipped_count": {
             "type": "integer"
@@ -8491,19 +8698,51 @@
         },
         "type": "object"
       },
-      "pulsight_internal_core_domain_aggregator.TipPriorityRatioPoint": {
+      "pulsight_internal_core_domain_aggregator.TipServiceSeries": {
         "properties": {
-          "bucket_ts": {
+          "bucket_secs": {
+            "description": "BucketSecs is the bucket width in seconds; buckets start on multiples\nof it since the Unix epoch.",
             "type": "integer"
           },
-          "priority_fee_sum": {
+          "buckets": {
+            "description": "Buckets is every bucket start from `from` through the bucket\ncontaining `to`, ascending.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "from": {
+            "description": "From is the first bucket's start (unix seconds).",
             "type": "integer"
           },
-          "ratio": {
-            "type": "number"
+          "services": {
+            "description": "Services is ordered by the window's tipped transactions, descending.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TipServiceSeriesRow"
+            },
+            "type": "array"
           },
-          "tip_sum_lamports": {
+          "to": {
+            "description": "To is the read time (unix seconds); the last bucket contains it and is\nstill filling.",
             "type": "integer"
+          },
+          "window": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.TipServiceSeriesRow": {
+        "properties": {
+          "tip_service": {
+            "type": "string"
+          },
+          "tipped_count": {
+            "description": "TippedCount is aligned with `buckets`; a bucket without one is 0.",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
           }
         },
         "type": "object"
