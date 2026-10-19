@@ -617,6 +617,240 @@
         "operationId": "getHealthLive"
       }
     },
+    "/api/legs/export": {
+      "get": {
+        "description": "Lists the complete UTC days of PumpSwap and Raydium CPMM legs the export serves (inside the ledger's 90-day history), how many parts each day is split into and the column schema. Free. Needs an api token with the `data:export` scope on an account the export is granted to.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.LegsExportCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not an api token, the token lacks data:export, or the export is not granted to the account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "List the exportable days of DEX legs",
+        "tags": [
+          "Legs-Export"
+        ],
+        "operationId": "getLegsExport"
+      }
+    },
+    "/api/legs/export/{day}/legs/{part}": {
+      "get": {
+        "description": "Streams, as Parquet (zstd), every PumpSwap and Raydium CPMM leg of the UTC day whose pool_id modulo the catalog's parts equals `part`, sorted by pool_id, slot, tx_index, ix_index. A pool's legs are in the same part every day. Columns: pool_id, mint_id, quote_mint_id (u64 ledger ids), dex, ts_ms, slot, tx_index, ix_index, trader (32 raw bytes), is_buy (the base side), base_amount, quote_amount, base_reserve_pre, quote_reserve_pre, base_reserve_post, quote_reserve_post (raw units), value_sol (lamports), swap_fee_bps (0 = unknown), flags. A request refused before streaming (400, 403, 429) is not charged, and one the server fails to deliver is refunded.",
+        "parameters": [
+          {
+            "description": "UTC day (YYYY-MM-DD) listed by the catalog",
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Part number, 0 to parts-1",
+            "in": "path",
+            "name": "part",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "CREDIT_EXHAUSTED — api credit pool empty",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not an api token, the token lacks data:export, or the export is not granted to the account",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Download one part of a day's DEX legs",
+        "tags": [
+          "Legs-Export"
+        ],
+        "operationId": "getLegsExportByDayLegsByPart"
+      }
+    },
+    "/api/legs/export/{day}/pools": {
+      "get": {
+        "description": "Streams, as Parquet (zstd), every pool with a PumpSwap or Raydium CPMM leg on the UTC day: pool_id, pool (base58), dex, mint_id and mint (the base, base58), quote_mint_id and quote_mint (base58), first_slot (the pool's first swap the ledger saw, which may predate the 90-day history). A request refused before streaming (400, 403, 429) is not charged, and one the server fails to deliver is refunded.",
+        "parameters": [
+          {
+            "description": "UTC day (YYYY-MM-DD) listed by the catalog",
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "CREDIT_EXHAUSTED — api credit pool empty",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not an api token, the token lacks data:export, or the export is not granted to the account",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Download the pools of a day's DEX legs",
+        "tags": [
+          "Legs-Export"
+        ],
+        "operationId": "getLegsExportByDayPools"
+      }
+    },
     "/api/me/credits": {
       "get": {
         "description": "Returns the caller's credit balance, per-cycle allowance and current period for the api credit pool.",
@@ -7161,6 +7395,35 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_aggregator.LegsExportCatalog": {
+        "properties": {
+          "days": {
+            "description": "Days are the exportable UTC days, newest first (YYYY-MM-DD).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "parts": {
+            "description": "Parts is how many parts each day is split into; a pool's legs are always in part pool_id % parts.",
+            "example": 16,
+            "type": "integer"
+          },
+          "schema": {
+            "description": "Schema is the column set every part of every day carries.",
+            "example": "legs-1",
+            "type": "string"
+          },
+          "venues": {
+            "description": "Venues are the venues whose legs are exported.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_aggregator.LpEvent": {
         "properties": {
           "base_amount": {
@@ -9287,19 +9550,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
@@ -11698,6 +11961,10 @@
     {
       "name": "Credits",
       "x-displayName": "Credits"
+    },
+    {
+      "name": "Legs-Export",
+      "x-displayName": "Legs Export"
     },
     {
       "name": "Market",
