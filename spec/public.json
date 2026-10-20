@@ -664,6 +664,64 @@
         "operationId": "getLegsExport"
       }
     },
+    "/api/legs/export/declared-quotes": {
+      "get": {
+        "description": "Streams, as Parquet (zstd), every mint a pool of a venue that names its base — PumpSwap, the pump bonding curve, Raydium LaunchLab, Meteora DBC — quotes in, with the earliest first swap of such a pool the ledger saw: mint_id (u64 ledger id), mint (base58) and first_slot. A pool counts by its merged ledger row, when it names a quote and its base is neither that quote nor a money mint (WSOL or a ledger dollar). The set only grows, except where a backfill dates a declaration earlier. Free, and refused like the parts (400, 403, 429) before streaming.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not an api token, the token lacks data:export, or the export is not granted to the account",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "content": {
+              "application/vnd.apache.parquet": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Download the quotes launch venues declared",
+        "tags": [
+          "Legs-Export"
+        ],
+        "operationId": "getLegsExportDeclaredQuotes"
+      }
+    },
     "/api/legs/export/{day}/legs/{part}": {
       "get": {
         "description": "Streams, as Parquet (zstd), every DEX leg of the UTC day, on every venue the ledger records, whose pool_id modulo the catalog's parts equals `part`, sorted by pool_id, slot, tx_index, ix_index. A pool's legs are in the same part every day. Columns: pool_id, mint_id, quote_mint_id (u64 ledger ids), dex, ts_ms, slot, tx_index, ix_index, trader (32 raw bytes), is_buy (the base side), base_amount, quote_amount, base_reserve_pre, quote_reserve_pre, base_reserve_post, quote_reserve_post (raw units), value_sol (lamports), swap_fee_bps (0 = unknown), flags. A request refused before streaming (400, 403, 429) is not charged, and one the server fails to deliver is refunded.",
