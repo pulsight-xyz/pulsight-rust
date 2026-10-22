@@ -7582,6 +7582,10 @@
             "description": "InsidersSinceMs is when the insider plane found its first insider (unix ms), 0 before it found any; insider holdings before it are unknown.",
             "type": "integer"
           },
+          "ledger_start_ms": {
+            "description": "LedgerStartMs is the time of the oldest leg the ledger holds (unix ms), 0 when it holds none; a pool's swaps before it are unknown.",
+            "type": "integer"
+          },
           "parts": {
             "description": "Parts is how many parts each day is split into; a pool's legs are always in part pool_id % parts.",
             "example": 16,
@@ -7589,7 +7593,7 @@
           },
           "schema": {
             "description": "Schema is the column set every part of every day carries.",
-            "example": "legs-2",
+            "example": "legs-3",
             "type": "string"
           }
         },
@@ -9721,19 +9725,19 @@
       },
       "pulsight_internal_core_domain_aggregator.Window": {
         "enum": [
+          "3m",
           "1d",
           "7d",
           "30d",
-          "all",
-          "3m"
+          "all"
         ],
         "type": "string",
         "x-enum-varnames": [
+          "Window3m",
           "Window1d",
           "Window7d",
           "Window30d",
-          "WindowAll",
-          "Window3m"
+          "WindowAll"
         ]
       },
       "pulsight_internal_core_domain_credit.Pool": {
