@@ -7575,7 +7575,7 @@
           },
           "facts_schema": {
             "description": "FactsSchema is the column set of the token facts files.",
-            "example": "facts-1",
+            "example": "facts-2",
             "type": "string"
           },
           "insiders_since_ms": {
