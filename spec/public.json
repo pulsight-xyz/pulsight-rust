@@ -700,7 +700,7 @@
             }
           },
           "429": {
-            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "description": "Every export slot is busy, or the account already has an export file streaming; retry after Retry-After seconds",
             "content": {
               "application/vnd.apache.parquet": {
                 "schema": {
@@ -808,7 +808,7 @@
             }
           },
           "429": {
-            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "description": "Every export slot is busy, or the account already has an export file streaming; retry after Retry-After seconds",
             "content": {
               "application/vnd.apache.parquet": {
                 "schema": {
@@ -906,7 +906,7 @@
             }
           },
           "429": {
-            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "description": "Every export slot is busy, or the account already has an export file streaming; retry after Retry-After seconds",
             "content": {
               "application/vnd.apache.parquet": {
                 "schema": {
@@ -995,7 +995,7 @@
             }
           },
           "429": {
-            "description": "Every export slot is busy; retry after Retry-After seconds",
+            "description": "Every export slot is busy, or the account already has an export file streaming; retry after Retry-After seconds",
             "content": {
               "application/vnd.apache.parquet": {
                 "schema": {
