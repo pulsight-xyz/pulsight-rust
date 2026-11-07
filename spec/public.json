@@ -7369,6 +7369,14 @@
           },
           "tip_service": {
             "type": "string"
+          },
+          "topup": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Money"
+              }
+            ],
+            "description": "TopUp is what the payer deposited into a pump holder-rewards pot in the\ntransaction: a cost of the sender, which net PnL subtracts, and no fee."
           }
         },
         "type": "object"
@@ -9538,6 +9546,13 @@
           "cashback_claimed_usd": {
             "type": "integer"
           },
+          "dex_fees": {
+            "description": "DexFees is the venue fees paid on top of the swap amounts, with the\ncashback a venue charges on top.",
+            "type": "integer"
+          },
+          "dex_fees_usd": {
+            "type": "integer"
+          },
           "didnt_buy_sells": {
             "description": "DidntBuySells / SoldGtBoughtSells count the window's uncovered sells:\nsells of a mint with no observed buy, and sells that exceeded the\nobserved bought balance.",
             "type": "integer"
@@ -9562,10 +9577,17 @@
             "type": "integer"
           },
           "net_realized_profit": {
-            "description": "NetRealizedProfit is the board row's net PnL: RealizedProfit minus\nTotalFees, TotalTips and FailedCostLamports, plus the kept cashback and\nthe holder rewards received — what the wallet actually kept. This is the\nHEADLINE PnL; RealizedProfit is the pre-cost component (accrual + arb\ntake-home).",
+            "description": "NetRealizedProfit is the board row's net PnL: RealizedProfit minus\nTotalFees, Topups, TotalTips and FailedCostLamports, plus the kept\ncashback and the holder rewards received — what the wallet actually\nkept. This is the HEADLINE PnL; RealizedProfit is the pre-cost component\n(accrual + arb take-home).",
             "type": "integer"
           },
           "net_realized_profit_usd": {
+            "type": "integer"
+          },
+          "platform_fees": {
+            "description": "PlatformFees is what trading tools and routers charged.",
+            "type": "integer"
+          },
+          "platform_fees_usd": {
             "type": "integer"
           },
           "realized_profit": {
@@ -9590,11 +9612,18 @@
           "token_num": {
             "type": "integer"
           },
+          "topups": {
+            "description": "Topups is what the wallet deposited into pump holder-rewards pots. It is\na cost, not a fee: TotalFees leaves it out and NetRealizedProfit\nsubtracts it.",
+            "type": "integer"
+          },
+          "topups_usd": {
+            "type": "integer"
+          },
           "total_buys": {
             "type": "integer"
           },
           "total_fees": {
-            "description": "TotalFees is the window's execution costs other than tips: network fees\n(base + priority) counted once per transaction, plus venue, platform and\ncashback-on-top fees.",
+            "description": "TotalFees is the window's execution costs other than tips: network fees\n(base + priority) counted once per transaction, plus venue, platform and\ncashback-on-top fees — TxFees + DexFees + PlatformFees.",
             "type": "integer"
           },
           "total_fees_usd": {
@@ -9612,6 +9641,13 @@
           },
           "trader": {
             "type": "string"
+          },
+          "tx_fees": {
+            "description": "TxFees is the network fees (base + priority), counted once per\ntransaction.",
+            "type": "integer"
+          },
+          "tx_fees_usd": {
+            "type": "integer"
           },
           "uncovered_proceeds_lamports": {
             "description": "UncoveredProceeds — proceeds of the window's sells of tokens with no\nknown cost (received by transfer, or beyond the recorded buys). Neither\nRealizedProfit nor NetRealizedProfit includes them.",
@@ -10188,6 +10224,24 @@
           "created_at": {
             "type": "string"
           },
+          "dex_fees_1d": {
+            "type": "number"
+          },
+          "dex_fees_1d_usd": {
+            "type": "number"
+          },
+          "dex_fees_30d": {
+            "type": "number"
+          },
+          "dex_fees_30d_usd": {
+            "type": "number"
+          },
+          "dex_fees_7d": {
+            "type": "number"
+          },
+          "dex_fees_7d_usd": {
+            "type": "number"
+          },
           "didnt_buy_sells_1d": {
             "type": "integer"
           },
@@ -10324,7 +10378,7 @@
             "type": "number"
           },
           "net_profit_7d": {
-            "description": "Net-of-costs windowed figures, lamports. NetProfit is realized PnL\nminus tips, per-transaction fees and the fees burned on failed / no-CPI\ntransactions — what the wallet actually kept. The gross figure stays on\nRealizedProfit*d so both are readable. SuccessRate / SpamRate are nil\nwhen the window observed no transactions at all (0 would read as\n\"never lands\").",
+            "description": "Net-of-costs windowed figures, lamports. NetProfit is realized PnL\nminus TotalCosts (fees, pot top-ups, tips and the fees burned on failed\n/ no-CPI transactions), plus the cashback claimed and the holder rewards\nreceived — what the wallet actually kept. The gross figure stays on\nRealizedProfit*d so both are readable. SuccessRate / SpamRate are nil\nwhen the window observed no transactions at all (0 would read as\n\"never lands\").",
             "type": "number"
           },
           "net_profit_7d_usd": {
@@ -10338,6 +10392,24 @@
           },
           "oldest_trade_at": {
             "type": "integer"
+          },
+          "platform_fees_1d": {
+            "type": "number"
+          },
+          "platform_fees_1d_usd": {
+            "type": "number"
+          },
+          "platform_fees_30d": {
+            "type": "number"
+          },
+          "platform_fees_30d_usd": {
+            "type": "number"
+          },
+          "platform_fees_7d": {
+            "type": "number"
+          },
+          "platform_fees_7d_usd": {
+            "type": "number"
           },
           "realized_profit": {
             "description": "RealizedProfit is the lifetime realized PnL in lamports.",
@@ -10482,6 +10554,24 @@
           "token_num_all": {
             "type": "integer"
           },
+          "topups_1d": {
+            "type": "number"
+          },
+          "topups_1d_usd": {
+            "type": "number"
+          },
+          "topups_30d": {
+            "type": "number"
+          },
+          "topups_30d_usd": {
+            "type": "number"
+          },
+          "topups_7d": {
+            "type": "number"
+          },
+          "topups_7d_usd": {
+            "type": "number"
+          },
           "total_costs_1d": {
             "type": "number"
           },
@@ -10516,6 +10606,25 @@
             "type": "number"
           },
           "total_profit_pnl_7d": {
+            "type": "number"
+          },
+          "tx_fees_1d": {
+            "type": "number"
+          },
+          "tx_fees_1d_usd": {
+            "type": "number"
+          },
+          "tx_fees_30d": {
+            "type": "number"
+          },
+          "tx_fees_30d_usd": {
+            "type": "number"
+          },
+          "tx_fees_7d": {
+            "description": "TotalCosts lines: TxFees the network fees, DexFees the venue fees and\nvenue cashback charged on top, PlatformFees what trading tools and\nrouters charged, Topups what the wallet deposited into pump\nholder-rewards pots. Tips and failed-tx burn are the rest.",
+            "type": "number"
+          },
+          "tx_fees_7d_usd": {
             "type": "number"
           },
           "updated_at": {
@@ -11404,6 +11513,12 @@
           "day": {
             "type": "string"
           },
+          "dex_fees": {
+            "type": "integer"
+          },
+          "dex_fees_usd": {
+            "type": "integer"
+          },
           "failed_cost": {
             "type": "integer"
           },
@@ -11414,7 +11529,7 @@
             "type": "integer"
           },
           "fees": {
-            "description": "Costs of the day (lamports): per-tx fees, tips, and failed-tx burn,\nagainst what pump paid the wallet that day — cashback CLAIMED and\nholder rewards RECEIVED, both cash basis — with `net = profit - fees\n- tips - failed_cost + cashback + holder_rewards` (profit already\nincludes the arbitrage take-home). The charts plot NET as the headline\nseries; `profit` stays as the flat/gross component.",
+            "description": "Costs of the day (lamports): fees, pot top-ups, tips, and failed-tx\nburn, against what pump paid the wallet that day — cashback CLAIMED and\nholder rewards RECEIVED, both cash basis — with `net = profit - fees\n- topups - tips - failed_cost + cashback + holder_rewards` (profit\nalready includes the arbitrage take-home). The charts plot NET as the\nheadline series; `profit` stays as the flat/gross component.",
             "type": "integer"
           },
           "fees_usd": {
@@ -11436,6 +11551,12 @@
           "net_usd": {
             "type": "integer"
           },
+          "platform_fees": {
+            "type": "integer"
+          },
+          "platform_fees_usd": {
+            "type": "integer"
+          },
           "profit": {
             "type": "integer"
           },
@@ -11450,6 +11571,20 @@
             "type": "integer"
           },
           "tips_usd": {
+            "type": "integer"
+          },
+          "topups": {
+            "description": "Topups is what the wallet deposited into pump holder-rewards pots: a\ncost in no fee line.",
+            "type": "integer"
+          },
+          "topups_usd": {
+            "type": "integer"
+          },
+          "tx_fees": {
+            "description": "TxFees, DexFees and PlatformFees itemize Fees: the network fees once\nper transaction, the venue fees and venue cashback charged on top of the\nswap amounts, and what trading tools and routers charged.",
+            "type": "integer"
+          },
+          "tx_fees_usd": {
             "type": "integer"
           },
           "txs": {
@@ -11643,6 +11778,24 @@
           "created_at": {
             "type": "string"
           },
+          "dex_fees_1d": {
+            "type": "number"
+          },
+          "dex_fees_1d_usd": {
+            "type": "number"
+          },
+          "dex_fees_30d": {
+            "type": "number"
+          },
+          "dex_fees_30d_usd": {
+            "type": "number"
+          },
+          "dex_fees_7d": {
+            "type": "number"
+          },
+          "dex_fees_7d_usd": {
+            "type": "number"
+          },
           "didnt_buy_sells_1d": {
             "type": "integer"
           },
@@ -11808,6 +11961,24 @@
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TraderPeriodStatsRow"
             },
             "type": "array"
+          },
+          "platform_fees_1d": {
+            "type": "number"
+          },
+          "platform_fees_1d_usd": {
+            "type": "number"
+          },
+          "platform_fees_30d": {
+            "type": "number"
+          },
+          "platform_fees_30d_usd": {
+            "type": "number"
+          },
+          "platform_fees_7d": {
+            "type": "number"
+          },
+          "platform_fees_7d_usd": {
+            "type": "number"
           },
           "pnl_distribution": {
             "description": "PnlDistribution is the 5-bucket realised-PnL distribution for\nthe request window: [<-50%, -50–0%, 0–2×, 2–5×, >5×]. Nil when\nthe snapshot wasn't inlined.",
@@ -11999,6 +12170,24 @@
           "tokens_graduated": {
             "type": "integer"
           },
+          "topups_1d": {
+            "type": "number"
+          },
+          "topups_1d_usd": {
+            "type": "number"
+          },
+          "topups_30d": {
+            "type": "number"
+          },
+          "topups_30d_usd": {
+            "type": "number"
+          },
+          "topups_7d": {
+            "type": "number"
+          },
+          "topups_7d_usd": {
+            "type": "number"
+          },
           "total_costs_1d": {
             "type": "number"
           },
@@ -12033,6 +12222,25 @@
             "type": "number"
           },
           "total_profit_pnl_7d": {
+            "type": "number"
+          },
+          "tx_fees_1d": {
+            "type": "number"
+          },
+          "tx_fees_1d_usd": {
+            "type": "number"
+          },
+          "tx_fees_30d": {
+            "type": "number"
+          },
+          "tx_fees_30d_usd": {
+            "type": "number"
+          },
+          "tx_fees_7d": {
+            "description": "The lines of TotalCosts7d beside tips and failed-tx burn: network fees,\nvenue fees (with venue cashback charged on top), platform fees, and\nwhat the wallet deposited into pump holder-rewards pots.",
+            "type": "number"
+          },
+          "tx_fees_7d_usd": {
             "type": "number"
           },
           "updated_at": {
