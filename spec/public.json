@@ -11,9 +11,34 @@
       "get": {
         "parameters": [
           {
-            "description": "Strategy ID (when called via /api/backtests)",
+            "description": "Strategy ID",
             "in": "query",
             "name": "strategy_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page size (default 20, max 200)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Page offset (default 0)",
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated: snapshot (strategy_snapshot), assumptions (summary.simulation_assumptions). Default none.",
+            "in": "query",
+            "name": "include",
             "schema": {
               "type": "string"
             }
@@ -22,6 +47,14 @@
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "X-Total-Count": {
+                "description": "The strategy's run count",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -119,6 +152,99 @@
           "Backtests"
         ],
         "operationId": "postBacktests"
+      }
+    },
+    "/api/backtests/assumptions": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.SimulationAssumptionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Backtest Simulation Assumptions",
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "getBacktestsAssumptions"
+      }
+    },
+    "/api/backtests/estimate": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.BacktestRequest"
+              }
+            }
+          },
+          "description": "The body POST /api/backtests takes",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.BacktestEstimate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Estimate Backtest",
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "postBacktestsEstimate"
       }
     },
     "/api/backtests/limits": {
@@ -290,6 +416,71 @@
         "operationId": "getBacktestsById"
       }
     },
+    "/api/backtests/{id}/breakdown": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Backtest ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated: mints, declines, equity, target (default mints,declines,equity)",
+            "in": "query",
+            "name": "include",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.BacktestBreakdown"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Backtest Breakdown",
+        "tags": [
+          "Backtests"
+        ],
+        "operationId": "getBacktestsByIdBreakdown"
+      }
+    },
     "/api/backtests/{id}/declines": {
       "get": {
         "parameters": [
@@ -303,7 +494,7 @@
             }
           },
           {
-            "description": "Page size (default 200, max 2000)",
+            "description": "Page size (default 200, max 5000)",
             "in": "query",
             "name": "limit",
             "schema": {
@@ -317,11 +508,51 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "description": "Only this mint's declines",
+            "in": "query",
+            "name": "mint",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "buy or sell",
+            "in": "query",
+            "name": "side",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "copy_buy, copy_sell, emit_buy or emit_sell",
+            "in": "query",
+            "name": "source",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "One decline reason, e.g. max_buys_per_position",
+            "in": "query",
+            "name": "reason",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "X-Total-Count": {
+                "description": "Declines matching the filters",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -369,7 +600,7 @@
             }
           },
           {
-            "description": "Page size (default 200, max 2000)",
+            "description": "Page size (default 200, max 5000)",
             "in": "query",
             "name": "limit",
             "schema": {
@@ -383,11 +614,43 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "description": "Only this mint's trades",
+            "in": "query",
+            "name": "mint",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "buy or sell",
+            "in": "query",
+            "name": "side",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "copy_buy, copy_sell, emit_buy, emit_sell or scope_exit",
+            "in": "query",
+            "name": "source",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
+            "headers": {
+              "X-Total-Count": {
+                "description": "Trades matching the filters",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -6218,6 +6481,18 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.SimulationAssumptionsResponse": {
+        "properties": {
+          "simulation_assumptions": {
+            "description": "SimulationAssumptions is the list every run's\nsummary.simulation_assumptions and every preview carry.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.StrategyListItem": {
         "properties": {
           "record": {
@@ -6229,32 +6504,63 @@
         },
         "type": "object"
       },
+      "internal_adapters_primary_http_handler.StrategyRunPoint": {
+        "properties": {
+          "backtest_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "description": "CreatedAt is when the run was submitted, the key the series is\nordered by.",
+            "type": "string"
+          },
+          "roi_pct": {
+            "type": "number"
+          },
+          "time_from": {
+            "description": "TimeFrom and TimeTo bound the window the run replayed.",
+            "type": "string"
+          },
+          "time_to": {
+            "type": "string"
+          },
+          "total_pnl_sol": {
+            "description": "TotalPnlSol is the run's summary.total_pnl_sol, not a running sum.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.StrategyStats": {
         "properties": {
           "draft": {
             "type": "boolean"
           },
-          "equity_points": {
-            "description": "EquityPoints is the cumulative-P&L curve across the most\nrecent ≤20 `done` runs, ordered ascending by finished_at.\nEach element is the running sum of `summary.total_pnl_sol`\nthrough that run, so a frontend <polyline> over these points\nrenders the dashboard sparkline directly.",
-            "items": {
-              "type": "number"
-            },
-            "type": "array"
-          },
           "last_run_at": {
+            "description": "LastRunAt is when that run finished, or when it was submitted\nwhile it has not finished.",
             "type": "string"
           },
           "last_run_pnl_sol": {
+            "description": "LastRunPnlSol is that run's summary.total_pnl_sol; null until\nthe run has a summary.",
             "type": "number"
           },
           "last_run_status": {
+            "description": "LastRunStatus is the status of the newest run by created_at,\nwhatever its outcome.",
             "type": "string"
           },
           "last_run_trades": {
+            "description": "LastRunTrades is that run's summary.trades: every fill, buys\nincluded.",
             "type": "integer"
           },
           "last_run_win_rate_pct": {
+            "description": "LastRunWinRatePct is that run's wins / (wins + losses) × 100, the\nwin rate the run page shows; null until the run has closed a trade.",
             "type": "number"
+          },
+          "run_points": {
+            "description": "RunPoints is one point per `done` run among the newest 20 by\ncreated_at, in ascending created_at order. Each point carries\nthat run's own total_pnl_sol, never a running sum: runs differ\nin window and scope, so their PnL does not add up to an equity.",
+            "items": {
+              "$ref": "#/components/schemas/internal_adapters_primary_http_handler.StrategyRunPoint"
+            },
+            "type": "array"
           },
           "total_runs": {
             "type": "integer"
@@ -10882,6 +11188,42 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_usecases_backtest.BacktestBreakdown": {
+        "properties": {
+          "backtest_id": {
+            "type": "string"
+          },
+          "declines_by_reason": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "equity": {
+            "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.EquityCurve"
+          },
+          "mints": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.MintBreakdown"
+            },
+            "type": "array"
+          },
+          "target": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TargetMintComparison"
+            },
+            "type": "array"
+          },
+          "target_wallets": {
+            "description": "TargetWallets are the mirrored wallets the target comparison reads.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_usecases_backtest.BacktestDecline": {
         "properties": {
           "backtest_id": {
@@ -10935,6 +11277,39 @@
           },
           "ts": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_usecases_backtest.BacktestEstimate": {
+        "properties": {
+          "credits": {
+            "description": "Credits is what the run would debit: one api credit per estimated tick.",
+            "type": "integer"
+          },
+          "estimated_ticks": {
+            "description": "EstimatedTicks is the run's tick count: candles in the window times\nthe scope's token slots (times the pools per mint on a per-pool run).",
+            "type": "integer"
+          },
+          "max_tick_budget": {
+            "description": "MaxTickBudget is the per-run tick ceiling, the most a run may cost.",
+            "type": "integer"
+          },
+          "max_window_secs": {
+            "description": "MaxWindowSecs is the longest window the request's timeframe allows, in\nseconds; 0 means unlimited.",
+            "type": "integer"
+          },
+          "mints_count": {
+            "description": "MintsCount is how many tokens the scope admits over the window: the\nexplicit list, or the strategy's own selection resolved minute by\nminute as a run resolves it.",
+            "type": "integer"
+          },
+          "within_budget": {
+            "description": "WithinBudget reports EstimatedTicks <= MaxTickBudget.",
+            "type": "boolean"
+          },
+          "within_window": {
+            "description": "WithinWindow reports that the window fits MaxWindowSecs.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -11013,7 +11388,12 @@
             "type": "string"
           },
           "strategy_snapshot": {
-            "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.StrategyDef"
+              }
+            ],
+            "description": "StrategySnapshot is the def the run executed, frozen at submit. A run\nlist carries it only with include=snapshot."
           },
           "summary": {
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.BacktestSummary"
@@ -11103,6 +11483,10 @@
             "description": "AvgLandingDriftBps is the mean ADVERSE-signed drift (bps) actually\ncrossed by the run's FILLED copies — what latency cost on the fills that\nwent through (reverted ones are excluded; their cost shows as\nRevertFeesSol + missed entries). Nil when the run had no landing fills.",
             "type": "number"
           },
+          "capital_required_sol": {
+            "description": "CapitalRequiredSol is the starting balance that would have kept the cash\nwalk at or above zero: max(StartingBalanceSol, StartingBalanceSol-MinCashSol).",
+            "type": "number"
+          },
           "copies_declined": {
             "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE refused: cooldown, sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit — plus the sells this run sat\nout because the target only sold tokens it had never mirrored. Reverts\nand unpriced skips have their own counters and are not in here. Every\none is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
             "type": "integer"
@@ -11150,6 +11534,10 @@
           "max_drawdown_sol": {
             "type": "number"
           },
+          "min_cash_sol": {
+            "description": "MinCashSol is the low point of the chronological cash walk: the starting\nbalance minus every buy's size and costs, plus every sell's proceeds net\nof costs, minus reverted fills' costs. Negative means the run spent SOL\nthe starting balance never had — the engine replays each token's whole\nwindow before the next one and cannot gate a buy on portfolio cash.",
+            "type": "number"
+          },
           "our_avg_price_impact_pct": {
             "description": "Price-impact rollups, in percent of mid. \"Our*\" averages over every\nsimulated trade that had a pool snapshot; \"Target*\" averages over the\ncopy trades that mirrored a target swap 1:1 (same timestamp). Zero when\nno trade contributed (e.g. an indicator-only strategy, or a run with no\npool data). Additive JSONB fields — pre-existing rows decode as 0.",
             "type": "number"
@@ -11183,8 +11571,12 @@
           "roi_pct": {
             "type": "number"
           },
+          "scope_exits_unpriced": {
+            "description": "ScopeExitsUnpriced counts the forced closes an `on_retire: sell` policy\ncould not fill because no candle had priced the token yet when it left\nthe selection: the position stays open, its exits keep firing, and\nwhatever is left at the end is marked in HeldPositions. Additive JSONB\nfield — old rows decode as 0.",
+            "type": "integer"
+          },
           "simulation_assumptions": {
-            "description": "SimulationAssumptions is free-text notes about which real-world\ncost components the simulator did NOT model (route hops, MEV,\npartial fills, pre-trade gas estimation, etc.). Rendered\nprominently on the result page so users don't read \"won 4.2 SOL\"\ntoo literally.",
+            "description": "SimulationAssumptions is free-text notes about which real-world\ncost components the simulator did NOT model (route hops, MEV,\npartial fills, pre-trade gas estimation, etc.). Rendered\nprominently on the result page so users don't read \"won 4.2 SOL\"\ntoo literally. A run list carries them only with include=assumptions.",
             "items": {
               "type": "string"
             },
@@ -11327,6 +11719,77 @@
           "DeclineUnmirrored"
         ]
       },
+      "pulsight_internal_core_usecases_backtest.EquityCurve": {
+        "properties": {
+          "max_drawdown_at": {
+            "type": "string"
+          },
+          "max_drawdown_sol": {
+            "type": "number"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.EquityPoint"
+            },
+            "type": "array"
+          },
+          "sampled_every_n_steps": {
+            "description": "SampledEveryNSteps is 1 when every step is a point, more when the walk\nwas sampled to MaxEquityPoints.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_usecases_backtest.EquityPoint": {
+        "properties": {
+          "balance_sol": {
+            "type": "number"
+          },
+          "ts": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_usecases_backtest.MintBreakdown": {
+        "properties": {
+          "buys": {
+            "type": "integer"
+          },
+          "declines": {
+            "description": "Declines counts the target swaps on the mint a copy exec wanted to act\non but did not fill.",
+            "type": "integer"
+          },
+          "fees_sol": {
+            "description": "FeesSol is the swap, tip, platform and transfer fees its fills paid.",
+            "type": "number"
+          },
+          "first_ts": {
+            "type": "string"
+          },
+          "held_at_end": {
+            "description": "HeldAtEnd reports a position still open when the run ended.",
+            "type": "boolean"
+          },
+          "last_ts": {
+            "type": "string"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "pool": {
+            "description": "Pool is the pool most of the mint's fills priced on.",
+            "type": "string"
+          },
+          "realized_pnl_sol": {
+            "type": "number"
+          },
+          "sells": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_usecases_backtest.PreviewMarker": {
         "properties": {
           "pool_sol_at_trigger": {
@@ -11420,6 +11883,40 @@
           "SideBuy",
           "SideSell"
         ]
+      },
+      "pulsight_internal_core_usecases_backtest.TargetMintComparison": {
+        "properties": {
+          "followed_pct": {
+            "description": "FollowedPct is our buys over the target's, in percent; absent when the\ntarget bought nothing.",
+            "type": "number"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "our_buys": {
+            "type": "integer"
+          },
+          "our_realized_sol": {
+            "type": "number"
+          },
+          "our_sells": {
+            "type": "integer"
+          },
+          "target_buys": {
+            "type": "integer"
+          },
+          "target_sells": {
+            "type": "integer"
+          },
+          "target_sol_in": {
+            "description": "TargetSolIn and TargetSolOut are the SOL the target spent buying and\nreceived selling in the window; their difference is a cash flow, not a\nrealized PnL, since a position can stay open.",
+            "type": "number"
+          },
+          "target_sol_out": {
+            "type": "number"
+          }
+        },
+        "type": "object"
       },
       "pulsight_internal_core_usecases_backtest.TimeRange": {
         "properties": {
