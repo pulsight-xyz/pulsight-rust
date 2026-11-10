@@ -9315,7 +9315,7 @@
             "type": "integer"
           },
           "swap_fee_parts": {
-            "description": "SwapFeeParts splits a configured SwapFeeBps into the shares the venue\ndefines, summing to it. Absent when the swap fee is recorded, a lower\nbound or unknown, and on a listing row.",
+            "description": "SwapFeeParts splits SwapFeeBps into the shares the venue defines,\nsumming to it: always for a configured fee, and for a recorded one where\nthe venue defines its split as shares of whatever fee it charges.\nAbsent when the swap fee is a lower bound or unknown, and on a listing\nrow.",
             "items": {
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TaxPart"
             },
@@ -9339,7 +9339,7 @@
                 "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TaxVia"
               }
             ],
-            "description": "Via is the extra a SOL trade pays when Pool is quoted in another token:\nthe hop between SOL and that token. Absent when Pool is quoted in SOL or\nin a money mint, on a listing row and on a market row. Never part of\nBuyBps, SellBps or a tax filter."
+            "description": "Via is the most a SOL trade adds when Pool is quoted in another token:\nthe hop between SOL and that token. Absent when Pool is quoted in SOL or\nin a money mint, on a listing row and on a market row. Never part of\nBuyBps, SellBps or a tax filter."
           }
         },
         "type": "object"
@@ -9351,11 +9351,12 @@
             "type": "number"
           },
           "kind": {
-            "description": "Kind names the share: `lp` (paid to liquidity providers), `protocol`\n(the venue), `fund` (the venue's fund), `creator` (the coin's creator),\n`holder_rewards` (the coin's holders), `cashback` (paid back to the\ntrader).",
+            "description": "Kind names the share: `lp` (paid to liquidity providers), `protocol`\n(the venue), `fund` (the venue's fund), `platform` (the launchpad\nplatform the pool belongs to), `creator` (the coin's creator),\n`holder_rewards` (the coin's holders), `cashback` (paid back to the\ntrader).",
             "enum": [
               "lp",
               "protocol",
               "fund",
+              "platform",
               "creator",
               "holder_rewards",
               "cashback"
@@ -9368,7 +9369,7 @@
       "pulsight_internal_core_domain_aggregator.TaxVia": {
         "properties": {
           "bps": {
-            "description": "Bps is what the hop adds, SwapFeeBps plus TransferFeeBps; absent while\neither is unknown.",
+            "description": "Bps is the most the hop adds: SwapFeeBps plus TransferFeeBps, what a SOL\ntrade pays when it swaps through Pool as a hop of its own. Absent while\neither is unknown. A router that prices the two hops together can charge\nless; see PumpRouted.",
             "type": "integer"
           },
           "dex": {
@@ -9378,6 +9379,10 @@
           "pool": {
             "description": "Pool is the hop's pool: the quote token's deepest pool paired with SOL,\nelse its reference pool.",
             "type": "string"
+          },
+          "pump_routed": {
+            "description": "PumpRouted reports that pump's own router (`multi_hop_swap`) serves this\nroute: Pool is a PumpSwap pool and the token's pool is a pump pool.\nThrough that router the hop adds nothing: pump charges the far pool's\nprotocol share on the hop instead of on the far pool, so a buyer it\nroutes pays the token's own tax alone.",
+            "type": "boolean"
           },
           "quote_mint": {
             "description": "QuoteMint is the quote token the hop swaps through.",
