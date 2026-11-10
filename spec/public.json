@@ -1574,7 +1574,7 @@
             }
           },
           {
-            "description": "Min tax in percent — the row's own tax: its reference pool's swap fee plus the mint's Token-2022 transfer fee, never the hop a token-quoted pool adds for a SOL trade (`tax.via`). Compared on the known part: a swap fee known only as a lower bound counts as that bound, and a mint whose swap fee is unknown passes only when its transfer fee alone reaches the floor.",
+            "description": "Min tax in percent — the row's own tax: its reference pool's swap fee plus the mint's Token-2022 transfer fee, never the hop a token-quoted pool adds for a SOL trade (`tax.via`). Compared exactly, to the millionth (`tax.buy_ppm`), on the known part: a swap fee known only as a lower bound counts as that bound, and a mint whose swap fee is unknown passes only when its transfer fee alone reaches the floor; a fee under a basis point is known, never unknown (0.004 % passes `min_tax=0.003`).",
             "in": "query",
             "name": "min_tax",
             "schema": {
@@ -2198,7 +2198,7 @@
             }
           },
           {
-            "description": "Min tax in percent — each row's own tax: that pool's swap fee plus the mint's transfer fee. Compared on the known part: a swap fee known only as a lower bound counts as that bound, and a pool whose swap fee is unknown passes only when the mint's transfer fee alone reaches the floor.",
+            "description": "Min tax in percent — each row's own tax: that pool's swap fee plus the mint's transfer fee. Compared exactly, to the millionth (`tax.buy_ppm`), on the known part: a swap fee known only as a lower bound counts as that bound, and a pool whose swap fee is unknown passes only when the mint's transfer fee alone reaches the floor.",
             "in": "query",
             "name": "min_tax",
             "schema": {
@@ -9286,6 +9286,10 @@
             "description": "BuyBps is the tax a buy pays, SwapFeeBps plus TransferFeeBps. Absent\nwhile either is unknown: the tax is then at least TransferFeeBps, plus\nSwapFeeMinBps when that is known.",
             "type": "integer"
           },
+          "buy_ppm": {
+            "description": "BuyPpm is the tax a buy pays in millionths of the traded value,\nSwapFeePpm plus TransferFeeBps × 100: BuyBps exactly. Absent while\neither is unknown.",
+            "type": "integer"
+          },
           "dex": {
             "description": "Dex is Pool's venue slug, same vocabulary as `?dex=`.",
             "type": "string"
@@ -9302,16 +9306,24 @@
             "description": "SellBps is the tax a sell pays, on the same components as BuyBps.",
             "type": "integer"
           },
+          "sell_ppm": {
+            "description": "SellPpm is the tax a sell pays in millionths, on the same components as\nBuyPpm.",
+            "type": "integer"
+          },
           "swap_fee_at": {
             "description": "SwapFeeAt is the minute a recorded SwapFeeBps was recorded in. Omitted on\na listing row and for a configured fee.",
             "type": "string"
           },
           "swap_fee_bps": {
-            "description": "SwapFeeBps is the pool's swap fee, the venue's whole schedule (LP,\nprotocol, creator and partner shares). Absent when it is unknown —\nnever free.",
+            "description": "SwapFeeBps is the pool's swap fee, the venue's whole schedule (LP,\nprotocol, creator and partner shares), rounded to the nearest basis\npoint: a known fee under half a basis point reads 0 here and exactly in\nSwapFeePpm. Absent when it is unknown — never free.",
             "type": "integer"
           },
           "swap_fee_min_bps": {
             "description": "SwapFeeMinBps is a lower bound on the pool's swap fee, set only while\nSwapFeeBps is unknown: the pool's configuration fixes a base fee and the\nvenue adds a variable fee on top that no recorded trade has priced yet.",
+            "type": "integer"
+          },
+          "swap_fee_min_ppm": {
+            "description": "SwapFeeMinPpm is SwapFeeMinBps in millionths, exactly.",
             "type": "integer"
           },
           "swap_fee_parts": {
@@ -9320,6 +9332,10 @@
               "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.TaxPart"
             },
             "type": "array"
+          },
+          "swap_fee_ppm": {
+            "description": "SwapFeePpm is the pool's swap fee in millionths of the traded value, set\nwhenever SwapFeeBps is: a configured fee to the millionth, a recorded one\nto the basis point.",
+            "type": "integer"
           },
           "swap_fee_source": {
             "description": "SwapFeeSource says where the swap fee comes from: `recorded`, the highest\nfee the pool's trades recorded in the latest minute that recorded one;\n`configured`, the pool's fee configuration read from chain. The\nconfiguration stands while the trades record its total or one hop's share\nof it, and a recorded fee it does not explain wins. Omitted on a listing\nrow.",
@@ -9380,6 +9396,10 @@
             "description": "Pool is the hop's pool: the quote token's deepest pool paired with SOL,\nelse its reference pool.",
             "type": "string"
           },
+          "ppm": {
+            "description": "Ppm is Bps in millionths of the traded value, exactly.",
+            "type": "integer"
+          },
           "pump_routed": {
             "description": "PumpRouted reports that pump's own router (`multi_hop_swap`) serves this\nroute: Pool is a PumpSwap pool and the token's pool is a pump pool.\nThrough that router the hop adds nothing: pump charges the far pool's\nprotocol share on the hop instead of on the far pool, so a buyer it\nroutes pays the token's own tax alone.",
             "type": "boolean"
@@ -9398,6 +9418,14 @@
           },
           "swap_fee_min_bps": {
             "description": "SwapFeeMinBps is a lower bound on that swap fee, set only while\nSwapFeeBps is unknown.",
+            "type": "integer"
+          },
+          "swap_fee_min_ppm": {
+            "description": "SwapFeeMinPpm is SwapFeeMinBps in millionths, exactly.",
+            "type": "integer"
+          },
+          "swap_fee_ppm": {
+            "description": "SwapFeePpm is SwapFeeBps in millionths, exactly.",
             "type": "integer"
           },
           "transfer_fee_bps": {
