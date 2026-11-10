@@ -1574,6 +1574,22 @@
             }
           },
           {
+            "description": "Min tax in percent — the row's tax: its reference pool's swap fee plus the mint's Token-2022 transfer fee. Compared on the known part: a mint whose swap fee is unknown passes only when its transfer fee alone reaches the floor.",
+            "in": "query",
+            "name": "min_tax",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Max tax in percent, on the same basis as min_tax: a mint whose swap fee is unknown passes unless its transfer fee alone exceeds the ceiling.",
+            "in": "query",
+            "name": "max_tax",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
             "description": "Only mints first seen within the last N seconds (launched < N ago). Mints with no observed first_seen are excluded.",
             "in": "query",
             "name": "max_age_secs",
@@ -2162,7 +2178,7 @@
     },
     "/api/mints/{pubkey}/markets": {
       "get": {
-        "description": "Returns per-(pool, dex) rollup with SOL-volume share (0..1) for a single mint over the requested window. `window=all` lists every market the mint ever traded on — use it to resolve markets for tokens with no recent activity. At most one pool carries `is_default: true` (window-independent): the mint's default market, the same pool an unpinned `/api/ohlcv` chart resolves to. An idle default market may be absent from short-window listings, so resolve defaults from `window=all`.",
+        "description": "Returns per-(pool, dex) rollup with SOL-volume share (0..1) for a single mint over the requested window. `window=all` lists every market the mint ever traded on — use it to resolve markets for tokens with no recent activity. At most one pool carries `is_default: true` (window-independent): the mint's default market, the same pool an unpinned `/api/ohlcv` chart resolves to. An idle default market may be absent from short-window listings, so resolve defaults from `window=all`. Every row carries the `tax` a trade of the mint pays on that pool (its swap fee plus the mint's transfer fee); `min_tax`/`max_tax` filter on it, and `sol_volume_share` stays a share of every market's volume.",
         "parameters": [
           {
             "description": "Mint pubkey",
@@ -2179,6 +2195,22 @@
             "name": "window",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "description": "Min tax in percent, compared on the known part: a pool whose swap fee is unknown passes only when the mint's transfer fee alone reaches the floor.",
+            "in": "query",
+            "name": "min_tax",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "description": "Max tax in percent, on the same basis: a pool whose swap fee is unknown passes unless the mint's transfer fee alone exceeds the ceiling.",
+            "in": "query",
+            "name": "max_tax",
+            "schema": {
+              "type": "number"
             }
           }
         ],
@@ -8190,6 +8222,14 @@
             "description": "PriceUsd / MarketCapUsd carry MintRow.PriceUsd and MintRow.MarketCapUsd\nverbatim, including their nil conditions (no priced reference pool,\nunknown decimals, absent supply).",
             "type": "number"
           },
+          "tax": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Tax"
+              }
+            ],
+            "description": "Tax carries MintRow.Tax verbatim, read the same way, so a dynamic pool\nfee stays current between identity reads."
+          },
           "unique_traders": {
             "description": "UniqueTraders is read straight off the insert-time `mint_traders`\nplane, so it is as fresh as ingest. nil when the plane has no row: this\nroute never falls back to a lifetime fold over positions, which is the\nread it exists to stop paying at poll cadence. A quote-registry mint has\nno rows on that plane and so never reports a count here.",
             "type": "integer"
@@ -8238,6 +8278,14 @@
           },
           "swap_count": {
             "type": "integer"
+          },
+          "tax": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Tax"
+              }
+            ],
+            "description": "Tax is what a trade of the page's mint pays on this pool: the pool's\nswap fee plus the mint's transfer fee. Always present; its unknown\ncomponents are omitted."
           }
         },
         "type": "object"
@@ -8433,6 +8481,14 @@
           },
           "symbol": {
             "type": "string"
+          },
+          "tax": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Tax"
+              }
+            ],
+            "description": "Tax is what a trade of the mint pays on its reference pool, the pool\nits price is read from: that pool's swap fee plus the mint's transfer\nfee. nil when the mint has no reference pool and no transfer fee on\nfile."
           },
           "tipped_share_pct": {
             "description": "TippedSharePct — share of the mint's trades whose transaction paid a\nlanding tip, in percent, over every trade since tips were recorded and\narbitrage excluded. nil until 20 such trades.",
@@ -9219,6 +9275,43 @@
             "type": "integer"
           },
           "tipped_count": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_aggregator.Tax": {
+        "properties": {
+          "buy_bps": {
+            "description": "BuyBps is the tax a buy pays, SwapFeeBps plus TransferFeeBps. Absent\nwhile either is unknown: the tax is then at least TransferFeeBps.",
+            "type": "integer"
+          },
+          "dex": {
+            "description": "Dex is Pool's venue slug, same vocabulary as `?dex=`.",
+            "type": "string"
+          },
+          "holder_rewards": {
+            "description": "HolderRewards reports that the creator share inside SwapFeeBps is paid\nto the coin's holders: the mint is a pump.fun holder-rewards coin and\nthe pool is its own pump.fun curve or PumpSwap pool. Never set on a\nlisting row, whose pool is not named.",
+            "type": "boolean"
+          },
+          "pool": {
+            "description": "Pool is the pool SwapFeeBps was read from: on the token page's row the\nmint's reference pool, the one its price is read from. Omitted on a\nlisting row and on a market row, which is its own pool.",
+            "type": "string"
+          },
+          "sell_bps": {
+            "description": "SellBps is the tax a sell pays, on the same components as BuyBps.",
+            "type": "integer"
+          },
+          "swap_fee_at": {
+            "description": "SwapFeeAt is the minute SwapFeeBps was recorded in. Omitted on a\nlisting row.",
+            "type": "string"
+          },
+          "swap_fee_bps": {
+            "description": "SwapFeeBps is the pool's swap fee, the venue's whole schedule (LP,\nprotocol, creator and partner shares): the highest fee its trades\nrecorded in the latest minute that recorded one. Absent when no trade\non the pool ever recorded a fee — unknown, never free.",
+            "type": "integer"
+          },
+          "transfer_fee_bps": {
+            "description": "TransferFeeBps is the mint's Token-2022 transfer fee, the higher of its\ncurrent and scheduled rate with its per-transfer cap not applied; 0 for\na mint without one. Absent until the mint account has been read.",
             "type": "integer"
           }
         },
