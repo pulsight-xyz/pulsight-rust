@@ -6910,6 +6910,12 @@
           "avg_sells_per_token": {
             "type": "number"
           },
+          "buy_impact_samples_30d": {
+            "type": "integer"
+          },
+          "buy_impact_samples_7d": {
+            "type": "integer"
+          },
           "holding_pnl_lamports": {
             "type": "number"
           },
@@ -6961,8 +6967,27 @@
           "med_sells_per_token": {
             "type": "number"
           },
+          "median_buy_impact_pct_30d": {
+            "type": "number"
+          },
+          "median_buy_impact_pct_7d": {
+            "description": "Buy-impact figures of the snapshot's wallet, the same fields and null\nrules as the trader listing: percent price move per constant-product\nbuy, quote reserve before it in SOL, buys measured.",
+            "type": "number"
+          },
+          "median_entry_pool_sol_30d": {
+            "type": "number"
+          },
+          "median_entry_pool_sol_7d": {
+            "type": "number"
+          },
           "oldest_trade_at": {
             "type": "string"
+          },
+          "p90_buy_impact_pct_30d": {
+            "type": "number"
+          },
+          "p90_buy_impact_pct_7d": {
+            "type": "number"
           },
           "pnl_distribution": {
             "items": {
@@ -11711,7 +11736,7 @@
             "type": "integer"
           },
           "copies_skipped_pool_not_simulated": {
-            "description": "CopiesSkippedPoolNotSimulated counts target swaps a per-pool run saw on a\nmarket it carried no instrument for (outside the mint's top pools, or a\npool the catalog does not know). They fold into the target book and are\nrecorded once as `pool_not_simulated`; nothing fills. A per-pool\nartefact, not in CopiesSkippedUnpriced. Additive JSONB field.",
+            "description": "CopiesSkippedPoolNotSimulated counts target swaps a per-pool run saw on a\nmarket it carried no instrument for (past the per-mint pool cap, or a\npool the catalog does not know). They fold into the target book and are\nrecorded once as `pool_not_simulated`; nothing fills. A per-pool\nartefact, not in CopiesSkippedUnpriced. Additive JSONB field.",
             "type": "integer"
           },
           "copies_skipped_unpriced": {
@@ -11769,7 +11794,7 @@
             "type": "number"
           },
           "positions_opened_unmarked": {
-            "description": "PositionsOpenedUnmarked counts positions the run opened while it had NO\nprice to mark them with — so for as long as that lasted, every\nprice-based exit rule (take-profit, stop, trailing stop, max-drawdown)\nevaluated as undefined and could not fire.\n\nIt happens because a copy fills at the price the TARGET left behind, on\nthe pool THEY traded, while the position is marked against the run's own\ncandle stream. Normally those are the same market. They are not when the\nfill lands somewhere the stream does not cover — a parallel venue, or a\nmarket whose candles simply have not started yet.\n\nLike CopiesSkippedUnpriced this is a COVERAGE number, not a result: an\nexit rule that could not be evaluated did not decline to fire, it never\nran, and the position rode on until something else closed it. A non-zero\nvalue means the run UNDER-represents its own exit rules — read the ROI\nwith that in mind.\n\nMid-window graduations used to dominate this and no longer do: the\ncandle stream now merges a token's whole migration lineage, so a\nbonding-curve entry is marked from the moment it opens. Additive JSONB\nfield — old rows decode as 0.",
+            "description": "PositionsOpenedUnmarked counts positions the run opened while it had NO\nprice to mark them with, so that every price-based exit rule\n(take-profit, stop, trailing stop, max-drawdown) evaluated as undefined\nand could not fire. A copy seeds the mark from its own triggering swap\nuntil the first candle closes, so a run records 0; a non-zero value is a\nrun from before that rule. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "realized_pnl_sol": {
@@ -11783,7 +11808,7 @@
             "type": "number"
           },
           "scope_exits_unpriced": {
-            "description": "ScopeExitsUnpriced counts the forced closes an `on_retire: sell` policy\ncould not fill because no candle had priced the token yet when it left\nthe selection: the position stays open, its exits keep firing, and\nwhatever is left at the end is marked in HeldPositions. Additive JSONB\nfield — old rows decode as 0.",
+            "description": "ScopeExitsUnpriced counts the forced closes an `on_retire: sell` policy\ncould not fill because nothing had priced the token yet when it left\nthe selection: the position stays open, its exits keep firing, and\nwhatever is left at the end is marked in HeldPositions. Additive JSONB\nfield — old rows decode as 0.",
             "type": "integer"
           },
           "simulation_assumptions": {
@@ -11873,7 +11898,7 @@
             "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.TradeSource"
           },
           "swap_fee_bps": {
-            "description": "SwapFeeBps is the venue swap fee this fill paid, in basis points.",
+            "description": "SwapFeeBps is the venue swap fee this fill paid, rounded to the nearest\nbasis point; the fill itself is charged to the millionth.",
             "type": "integer"
           },
           "target_price_impact_pct": {
@@ -12395,6 +12420,14 @@
           "buy_all": {
             "type": "integer"
           },
+          "buy_impact_samples_30d": {
+            "description": "Buys measured for the 30-day buy-impact figures.",
+            "type": "integer"
+          },
+          "buy_impact_samples_7d": {
+            "description": "Buys measured for the 7-day buy-impact figures.",
+            "type": "integer"
+          },
           "buy_sell_ratio_1d": {
             "type": "number"
           },
@@ -12602,6 +12635,22 @@
           "median_buy_count_per_token": {
             "type": "number"
           },
+          "median_buy_impact_pct_30d": {
+            "description": "Median price move per buy over the last 30 days, in percent.",
+            "type": "number"
+          },
+          "median_buy_impact_pct_7d": {
+            "description": "Median price move per buy over the last 7 days, in percent (2 = 2 %):\n(B_pre/B_post)^2 - 1 on the pool's base reserve, capped at 1000 %.\nConstant-product venues only (pump bonding curve, PumpSwap, Raydium\nAMM v4/CPMM, Meteora pools, Fluxbeam, Heaven, Omnipair); about twice the\nbacktest's target_price_impact_pct for the same swap. Null until the\nwindow is served or when no buy was measured.",
+            "type": "number"
+          },
+          "median_entry_pool_sol_30d": {
+            "description": "Median quote reserve of the pool before each buy over the last 30 days, in SOL.",
+            "type": "number"
+          },
+          "median_entry_pool_sol_7d": {
+            "description": "Median quote reserve of the pool before each buy over the last 7 days,\nin SOL; on the pump bonding curve it includes the curve's virtual SOL.\nNull when no measured buy was valued.",
+            "type": "number"
+          },
           "median_first_buy_reactivity": {
             "type": "number"
           },
@@ -12662,6 +12711,14 @@
           },
           "oldest_trade_at": {
             "type": "integer"
+          },
+          "p90_buy_impact_pct_30d": {
+            "description": "90th-percentile price move per buy over the last 30 days, in percent.",
+            "type": "number"
+          },
+          "p90_buy_impact_pct_7d": {
+            "description": "90th-percentile price move per buy over the last 7 days, in percent.",
+            "type": "number"
           },
           "periods": {
             "description": "Periods is one row per canonical window (1d, 7d, 30d, all) off the\nwallet's board row. Drives the period stats panel on the\ntrader-detail page.",
