@@ -1095,7 +1095,7 @@
     },
     "/api/legs/export/{day}/legs/{part}": {
       "get": {
-        "description": "Streams, as Parquet (zstd), every DEX leg of the UTC day, on every venue the ledger records, whose pool_id modulo the catalog's parts equals `part`, sorted by pool_id, slot, tx_index, ix_index. A pool's legs are in the same part every day. Columns: pool_id, mint_id, quote_mint_id (u64 ledger ids), dex, ts_ms, slot, tx_index, ix_index, trader (32 raw bytes), is_buy (the base side), base_amount, quote_amount, base_reserve_pre, quote_reserve_pre, base_reserve_post, quote_reserve_post (raw units), value_sol (lamports), swap_fee_bps (0 = unknown), flags, marginal_price_q (f64, raw quote units per raw base unit after the leg: the pool's marginal price, else the leg's own quote_amount / base_amount; 0 = unknown). A request refused before streaming (400, 403, 429) is not charged, and one the server fails to deliver is refunded.",
+        "description": "Streams, as Parquet (zstd), every DEX leg of the UTC day, on every venue the ledger records, whose pool_id modulo the catalog's parts equals `part`, sorted by pool_id, slot, tx_index, ix_index. A pool's legs are in the same part every day. Columns: pool_id, mint_id, quote_mint_id (u64 ledger ids), dex, ts_ms, slot, tx_index, ix_index, trader (32 raw bytes), is_buy (the base side), base_amount, quote_amount, base_reserve_pre, quote_reserve_pre, base_reserve_post, quote_reserve_post (raw units), value_sol (lamports), swap_fee_bps (0 = unknown), flags, marginal_price_q (f64, raw quote units per raw base unit after the leg: the pool's marginal price, else the leg's own quote_amount / base_amount; 0 = unknown), mayhem (flags & 1: the leg traded a pump.fun bonding curve or PumpSwap pool the ledger knows is in mayhem mode; false when it is not or its mode is unknown), custodial (the leg is pump.fun's Mayhem agent trading through its custody program, not a wallet trading for itself). A request refused before streaming (400, 403, 429) is not charged, and one the server fails to deliver is refunded.",
         "parameters": [
           {
             "description": "UTC day (YYYY-MM-DD) listed by the catalog",
@@ -5002,7 +5002,7 @@
     },
     "/api/traders": {
       "get": {
-        "description": "Retrieves a list of traders supporting advanced filtering and sorting.",
+        "description": "Retrieves a list of traders supporting advanced filtering and sorting. The page is ranked by `sort_by` at `window`; every row carries its 7d and 30d figures, plus the 1d and lifetime families the window or `extra_windows` names.",
         "parameters": [
           {
             "description": "Limit",
@@ -5023,11 +5023,55 @@
             }
           },
           {
-            "description": "Sort key: realized_profit, winrate or last_active_ts",
+            "description": "Ranking key. `realized_profit` (the default) ranks NET PnL after costs, the opposite of the `f=` key `realized_profit`, which is gross; `total_profit` ranks gross realized PnL. Every other key is the `f=` key of the figure it ranks, plus `roi` and `total_costs`; `pnl` and `net_profit` alias `realized_profit`, `last_seen` aliases `last_active_ts`, and an unknown key ranks net PnL. A key with no figure for the window is refused with a 400: token_num, didnt_buy_sells, sold_gt_bought_sells, success_rate, spam_rate, failed_txs, landed_txs and total_costs have no lifetime figure.",
             "in": "query",
             "name": "sort_by",
             "schema": {
               "type": "string",
+              "enum": [
+                "realized_profit",
+                "net_profit",
+                "pnl",
+                "total_profit",
+                "roi",
+                "winrate",
+                "arb_tx_ratio",
+                "avg_realized_profit",
+                "median_realized_profit",
+                "buy",
+                "sell",
+                "buy_sell_ratio",
+                "token_num",
+                "didnt_buy_sells",
+                "sold_gt_bought_sells",
+                "rewards_total",
+                "holder_rewards",
+                "holder_reward_payouts",
+                "cashback",
+                "cashback_claimed",
+                "cashback_share",
+                "cashback_claim_count",
+                "landed_txs",
+                "failed_txs",
+                "spam_rate",
+                "success_rate",
+                "total_costs",
+                "sol_balance",
+                "holding_pnl",
+                "avg_buy_count_per_token",
+                "median_buy_count_per_token",
+                "avg_sell_count_per_token",
+                "median_sell_count_per_token",
+                "avg_first_buy_reactivity",
+                "median_first_buy_reactivity",
+                "avg_holding_time",
+                "median_holding_time",
+                "oldest_trade_at",
+                "creator_tokens_created",
+                "creator_tokens_graduated",
+                "last_active_ts",
+                "last_seen"
+              ],
               "default": "realized_profit"
             }
           },
@@ -5038,6 +5082,33 @@
             "schema": {
               "type": "string",
               "default": "desc"
+            }
+          },
+          {
+            "description": "The window the page is ranked over: the sorted figure's window and the listed population. 1d, 7d and 30d list the traders who traded in it; all ranks lifetime figures of the traders with 10+ trades in the last 30 days (the unfiltered 7d/30d pages ranked by net PnL, win rate or last active list every trader who traded in the window; every other page also needs those 10+ trades). An `f=` clause without a window suffix compiles at 30d when window=30d and at 7d otherwise, whatever this window.",
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1d",
+                "7d",
+                "30d",
+                "all"
+              ],
+              "default": "7d"
+            }
+          },
+          {
+            "description": "Filter clauses `key[_window]|op|value[|value2]`, AND-combined. A windowed key without a suffix compiles at 30d when window=30d and at 7d otherwise; a buy-impact key without a suffix is refused on a 1d or all page.",
+            "in": "query",
+            "name": "f",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           {
@@ -5057,7 +5128,7 @@
             }
           },
           {
-            "description": "Comma list of DISPLAY-only window families to include: 1d, all. They ride the same board row; sorting is unaffected (it reads 7d/30d board columns) and f= filters read 1d/7d/30d board columns.",
+            "description": "Comma list of the window families each row carries beyond 7d and 30d: 1d, all. They ride the same board row; the family of the page's window is always included.",
             "in": "query",
             "name": "extra_windows",
             "schema": {
@@ -5086,7 +5157,7 @@
             }
           },
           "400": {
-            "description": "Bad Request",
+            "description": "INVALID_INPUT — a sort_by with no figure for the window, an unknown unit, or a buy-impact filter the ledger does not serve yet",
             "content": {
               "application/json": {
                 "schema": {
@@ -5116,7 +5187,7 @@
             }
           },
           "500": {
-            "description": "Internal Server Error",
+            "description": "The leaderboard read failed; a failed read is never served as an empty page",
             "content": {
               "application/json": {
                 "schema": {
@@ -10503,6 +10574,10 @@
               }
             ],
             "description": "Selection is the token-universe plane: a boolean tree of selection\npredicates rooted at a single Universe node. nil (or empty) ⇒ the\nstrategy does not describe its own universe — it needs mirror\nwallets or an explicit run-time scope."
+          },
+          "timeframe": {
+            "description": "Timeframe is the candle timeframe the strategy was built for, one of\nthe run timeframes; empty when it names none. A run still takes its\nown timeframe.",
+            "type": "string"
           }
         },
         "type": "object"
@@ -11539,6 +11614,13 @@
             "description": "MintsCount is how many tokens the scope admits over the window: the\nexplicit list, or the strategy's own selection resolved minute by\nminute as a run resolves it.",
             "type": "integer"
           },
+          "warnings": {
+            "description": "Warnings are caveats about the resolution the run would replay, such\nas a token selection that stopped at its candidate cap.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "within_budget": {
             "description": "WithinBudget reports EstimatedTicks <= MaxTickBudget.",
             "type": "boolean"
@@ -11743,6 +11825,10 @@
             "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap could not be priced honestly\n— so they were NOT traded. Two causes, both data-side:\n\n  1. no post-swap price on the leg at all (every Meteora DLMM leg, and\n     every DAMM v2 / DBC leg ingested before those decoders were fixed);\n  2. a leg whose reserve is impossible for a post-swap snapshot, which\n     means it is a PRE-swap one and its price is the pre-swap price\n     (PumpSwap — see postSwapReserveConsistent).\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. Cause 1 makes a launch-sniping\nmirror over historical data skip most of its entries; cause 2 fires on\nexactly the large launch buys such a strategy targets. Surfaced so a\nmostly-skipped run reads as \"not enough data\" instead of quietly looking\nlike a thin strategy — or worse, than being filled at a fictional price\nand looking profitable. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
+          "emit_buys_declined": {
+            "description": "EmitBuysDeclined counts the candle closes on which an Emit buy whose\nrule held was refused by a rule — sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit — once per refusal: an Emit\nbuy refused on consecutive closes for the same reason counts once, until\nit fills, a close finds it not ready to fire or the reason changes. Each\none is persisted as a `backtest_declines` row with its reason, source\n`emit_buy` and no triggering swap. An Emit buy a target's swap triggered\ncounts in CopiesDeclined instead. Additive JSONB field — old rows decode\nas 0.",
+            "type": "integer"
+          },
           "ending_balance_sol": {
             "type": "number"
           },
@@ -11843,6 +11929,13 @@
           "unrealized_pnl_sol": {
             "type": "number"
           },
+          "warnings": {
+            "description": "Warnings are caveats about this run's own inputs, such as a token\nselection that stopped at its candidate cap. Additive JSONB field.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "wins": {
             "type": "integer"
           }
@@ -11937,7 +12030,8 @@
           "no_bracket",
           "rate_limited",
           "reverted",
-          "unmirrored"
+          "unmirrored",
+          "curve_complete"
         ],
         "type": "string",
         "x-enum-varnames": [
@@ -11952,7 +12046,8 @@
           "DeclineNoBracket",
           "DeclineRateLimited",
           "DeclineReverted",
-          "DeclineUnmirrored"
+          "DeclineUnmirrored",
+          "DeclineCurveComplete"
         ]
       },
       "pulsight_internal_core_usecases_backtest.EquityCurve": {
@@ -12640,7 +12735,7 @@
             "type": "number"
           },
           "median_buy_impact_pct_7d": {
-            "description": "Median price move per buy over the last 7 days, in percent (2 = 2 %):\n(B_pre/B_post)^2 - 1 on the pool's base reserve, capped at 1000 %.\nConstant-product venues only (pump bonding curve, PumpSwap, Raydium\nAMM v4/CPMM, Meteora pools, Fluxbeam, Heaven, Omnipair); about twice the\nbacktest's target_price_impact_pct for the same swap. Null until the\nwindow is served or when no buy was measured.",
+            "description": "Median price move per buy over the last 7 days, in percent (2 = 2 %):\n(B_pre/B_post)^2 - 1 on the pool's base reserve, capped at 1000 %.\nConstant-product venues only (pump bonding curve, PumpSwap, Raydium\nAMM v4/CPMM, Meteora pools, Fluxbeam, Heaven, Omnipair); about twice the\nbacktest's target_price_impact_pct for the same swap. Null until the\nwindow is served or when no buy was measured. The figures fold a daily\nplane: \"7 days\" spans 7 to 8 calendar days (the oldest UTC day counts\nwhole), \"30 days\" 30 to 31.",
             "type": "number"
           },
           "median_entry_pool_sol_30d": {
