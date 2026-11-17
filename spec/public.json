@@ -5023,7 +5023,7 @@
             }
           },
           {
-            "description": "Ranking key. `realized_profit` (the default) ranks NET PnL after costs, the opposite of the `f=` key `realized_profit`, which is gross; `total_profit` ranks gross realized PnL. Every other key is the `f=` key of the figure it ranks, plus `roi` and `total_costs`; `pnl` and `net_profit` alias `realized_profit`, `last_seen` aliases `last_active_ts`, and an unknown key ranks net PnL. A key with no figure for the window is refused with a 400: token_num, didnt_buy_sells, sold_gt_bought_sells, success_rate, spam_rate, failed_txs, landed_txs and total_costs have no lifetime figure.",
+            "description": "Ranking key. `realized_profit` (the default) ranks NET PnL after costs, the opposite of the `f=` key `realized_profit`, which is gross; `total_profit` ranks gross realized PnL. Every other key is the `f=` key of the figure it ranks, plus `roi` and `total_costs`; `pnl` and `net_profit` alias `realized_profit`, `last_seen` aliases `last_active_ts`, and an unknown key ranks net PnL. A key with no figure for the window is refused with a 400: token_num, didnt_buy_sells, sold_gt_bought_sells, success_rate, spam_rate, failed_txs, landed_txs and total_costs have no lifetime figure. `similarity` ranks by the rows' similarity to `ref`, which it requires (400 without it, and 400 when the reference has fewer than 3 traits measured at the window); rows with no score rank last in both directions, and the cursor is the unrounded score.",
             "in": "query",
             "name": "sort_by",
             "schema": {
@@ -5070,7 +5070,8 @@
                 "creator_tokens_created",
                 "creator_tokens_graduated",
                 "last_active_ts",
-                "last_seen"
+                "last_seen",
+                "similarity"
               ],
               "default": "realized_profit"
             }
@@ -5085,7 +5086,7 @@
             }
           },
           {
-            "description": "The window the page is ranked over: the sorted figure's window and the listed population. 1d, 7d and 30d list the traders who traded in it; all ranks lifetime figures of the traders with 10+ trades in the last 30 days (the unfiltered 7d/30d pages ranked by net PnL, win rate or last active list every trader who traded in the window; every other page also needs those 10+ trades). An `f=` clause without a window suffix compiles at 30d when window=30d and at 7d otherwise, whatever this window.",
+            "description": "The window the page is ranked over: the sorted figure's window and the listed population. A ranked page lists the traders with 10+ trades in the last 30 days: at 1d, 7d and 30d those of them who traded in the window, at all their lifetime figures; a `search`, `favorites_only` or `tracked_only` page matches its wallets whatever their activity. An `f=` clause without a window suffix compiles at 30d when window=30d and at 7d otherwise, whatever this window.",
             "in": "query",
             "name": "window",
             "schema": {
@@ -5143,6 +5144,14 @@
               "type": "string",
               "default": "sol"
             }
+          },
+          {
+            "description": "Reference wallet of a similar listing. Every row carries `similarity`, its style closeness to this wallet (0-100 over win rate, tokens traded and SOL per buy at `window`, median buys and sells per token and median hold over every position, and tags; an unmeasured trait counts half; no score below 3 measured traits), the envelope carries the wallet's own row as `reference`, and the wallet is left out of its own result. The page never ranks off a precomputed board. Required by sort_by=similarity.",
+            "in": "query",
+            "name": "ref",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5157,7 +5166,7 @@
             }
           },
           "400": {
-            "description": "INVALID_INPUT — a sort_by with no figure for the window, an unknown unit, or a buy-impact filter the ledger does not serve yet",
+            "description": "INVALID_INPUT — a sort_by with no figure for the window, an unknown unit, a buy-impact filter the ledger does not serve yet, a `ref` that is not a wallet, or sort_by=similarity without `ref` or with a reference measured on fewer than 3 traits",
             "content": {
               "application/json": {
                 "schema": {
@@ -10683,6 +10692,103 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_trader.MoneyTraitValue": {
+        "properties": {
+          "closeness": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number"
+          },
+          "value_usd": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.Similarity": {
+        "properties": {
+          "buy_size": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.MoneyTraitValue"
+          },
+          "label": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.SimilarityLabel"
+              }
+            ],
+            "description": "Label names the score's band; null with the score."
+          },
+          "median_hold_secs": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TraitValue"
+          },
+          "score": {
+            "description": "Score is the similarity, 0–100, and the page's sort value rounded; null\nwhen fewer than three traits are measured on both wallets.",
+            "type": "integer"
+          },
+          "tags": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TagsTrait"
+          },
+          "tokens_traded": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TraitValue"
+          },
+          "trades_per_token": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TradesPerTokenTrait"
+          },
+          "traits_total": {
+            "description": "TraitsTotal counts the traits the window carries: 6, or 5 at lifetime,\nwhich has no token count.",
+            "type": "integer"
+          },
+          "traits_used": {
+            "description": "TraitsUsed counts the traits measured on both wallets.",
+            "type": "integer"
+          },
+          "volume": {
+            "description": "Volume is the window's bought plus sold value in lamports, with its USD\ntwin (micro-USD). It is shown beside the score, never part of it.",
+            "type": "number"
+          },
+          "volume_usd": {
+            "type": "number"
+          },
+          "window": {
+            "description": "Window is the window the windowed traits are read at (the page's).",
+            "type": "string"
+          },
+          "winrate": {
+            "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.TraitValue"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.SimilarityLabel": {
+        "enum": [
+          "very_alike",
+          "alike",
+          "somewhat_alike",
+          "different"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "SimilarityVeryAlike",
+          "SimilarityAlike",
+          "SimilaritySomewhatAlike",
+          "SimilarityDifferent"
+        ]
+      },
+      "pulsight_internal_core_domain_trader.TagsTrait": {
+        "properties": {
+          "closeness": {
+            "type": "number"
+          },
+          "value": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_trader.Trader": {
         "properties": {
           "arb_tx_ratio_1d": {
@@ -11118,6 +11224,14 @@
           "sell_all": {
             "type": "integer"
           },
+          "similarity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Similarity"
+              }
+            ],
+            "description": "Similarity is the row's style closeness to the reference wallet of a\nsimilar listing (`ref`); absent without one."
+          },
           "sol_balance": {
             "description": "SolBalance is the wallet's SOL balance in lamports.",
             "type": "number"
@@ -11272,6 +11386,31 @@
             "type": "number"
           },
           "winrate_all_usd": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.TradesPerTokenTrait": {
+        "properties": {
+          "buys": {
+            "type": "number"
+          },
+          "closeness": {
+            "type": "number"
+          },
+          "sells": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_trader.TraitValue": {
+        "properties": {
+          "closeness": {
+            "type": "number"
+          },
+          "value": {
             "type": "number"
           }
         },
@@ -12972,6 +13111,14 @@
           "sell_all": {
             "type": "integer"
           },
+          "similarity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_trader.Similarity"
+              }
+            ],
+            "description": "Similarity is the row's style closeness to the page's reference wallet\n(`ref`); absent without one."
+          },
           "sol_balance": {
             "type": "number"
           },
@@ -13155,6 +13302,14 @@
           },
           "offset": {
             "type": "integer"
+          },
+          "reference": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_usecases_trader.TraderListItem"
+              }
+            ],
+            "description": "Reference is the reference wallet's own row on the page's basis (its\nsimilarity block compares it with itself), on a page read with `ref`;\nabsent when the board holds no row for it."
           },
           "total": {
             "type": "integer"
