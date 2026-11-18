@@ -3570,6 +3570,73 @@
         "operationId": "postStrategies"
       }
     },
+    "/api/strategies/confluence-preview": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/internal_adapters_primary_http_handler.ConfluencePreviewRequest"
+              }
+            }
+          },
+          "description": "The node's data",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ConfluencePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_adapters_primary_http_handler.errorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-token": []
+          }
+        ],
+        "summary": "Preview Wallet Confluence",
+        "tags": [
+          "Strategies"
+        ],
+        "operationId": "postStrategiesConfluencePreview"
+      }
+    },
     "/api/strategies/dashboard": {
       "get": {
         "responses": {
@@ -6550,6 +6617,19 @@
       }
     },
     "schemas": {
+      "internal_adapters_primary_http_handler.ConfluencePreviewRequest": {
+        "properties": {
+          "node": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.WalletConfluenceCondition"
+              }
+            ],
+            "description": "Node is the node's data, as the strategy holds it."
+          }
+        },
+        "type": "object"
+      },
       "internal_adapters_primary_http_handler.DashboardStats": {
         "properties": {
           "aggregate_sim_pnl_sol": {
@@ -10456,6 +10536,116 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_strategy.ComparisonOp": {
+        "enum": [
+          "gt",
+          "gte",
+          "lt",
+          "lte",
+          "eq"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "ComparisonGt",
+          "ComparisonGte",
+          "ComparisonLt",
+          "ComparisonLte",
+          "ComparisonEq"
+        ]
+      },
+      "pulsight_internal_core_domain_strategy.ConfluenceCount": {
+        "enum": [
+          "entries",
+          "buys"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "ConfluenceCountEntries",
+          "ConfluenceCountBuys"
+        ]
+      },
+      "pulsight_internal_core_domain_strategy.ConfluenceFire": {
+        "properties": {
+          "at": {
+            "description": "At is the instant, unix seconds.",
+            "type": "integer"
+          },
+          "mint": {
+            "description": "Mint is the token's address.",
+            "type": "string"
+          },
+          "votes": {
+            "description": "Votes is how many wallets the condition counted then, after merging same-second buys.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_strategy.ConfluenceMetric": {
+        "enum": [
+          "holders",
+          "buyers",
+          "sellers"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "ConfluenceHolders",
+          "ConfluenceBuyers",
+          "ConfluenceSellers"
+        ]
+      },
+      "pulsight_internal_core_domain_strategy.ConfluencePreview": {
+        "properties": {
+          "capped": {
+            "description": "Capped is true when the wallets' trades exceeded what one preview reads; the counts are then lower bounds.",
+            "type": "boolean"
+          },
+          "fires": {
+            "description": "Fires lists the 50 most recent of those instants, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ConfluenceFire"
+            },
+            "type": "array"
+          },
+          "fires_7d": {
+            "description": "Fires7d counts the instants the condition became true inside the window, across every token.",
+            "type": "integer"
+          },
+          "same_operator": {
+            "description": "SameOperator lists up to 20 wallet pairs that bought the same tokens within 1 second of each other, highest rate first.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.SameOperatorPair"
+            },
+            "type": "array"
+          },
+          "tokens_7d": {
+            "description": "Tokens7d counts the tokens on which it became true at least once.",
+            "type": "integer"
+          },
+          "window_from": {
+            "description": "WindowFrom is the start of the 7-day window, unix seconds.",
+            "type": "integer"
+          },
+          "window_to": {
+            "description": "WindowTo is the end of the window (now), unix seconds.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pulsight_internal_core_domain_strategy.ConfluenceSource": {
+        "properties": {
+          "group_id": {
+            "description": "GroupID is the favorites group, or \"ungrouped\".",
+            "type": "string"
+          },
+          "synced_at": {
+            "description": "SyncedAt is when the wallets were taken from the group.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_strategy.Edge": {
         "properties": {
           "from": {
@@ -10565,6 +10755,35 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_domain_strategy.SameOperatorPair": {
+        "properties": {
+          "a": {
+            "description": "A is the first wallet, in the order of the set.",
+            "type": "string"
+          },
+          "b": {
+            "description": "B is the second wallet.",
+            "type": "string"
+          },
+          "co_bought_tokens": {
+            "description": "CoBoughtTokens counts the tokens both entered within 1 second of each other.",
+            "type": "integer"
+          },
+          "co_buy_rate": {
+            "description": "CoBuyRate is CoBoughtTokens divided by SmallerTokens.",
+            "type": "number"
+          },
+          "shared_tokens": {
+            "description": "SharedTokens counts the tokens both wallets entered in the window.",
+            "type": "integer"
+          },
+          "smaller_tokens": {
+            "description": "SmallerTokens is the smaller of the two wallets' counts of tokens entered.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "pulsight_internal_core_domain_strategy.StrategyDef": {
         "properties": {
           "constraints": {
@@ -10620,6 +10839,73 @@
           "VenueHyperliquid",
           "VenuePolymarket"
         ]
+      },
+      "pulsight_internal_core_domain_strategy.WalletConfluenceCondition": {
+        "properties": {
+          "count": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ConfluenceCount"
+              }
+            ],
+            "description": "Count applies to buyers only: entries (positions opened, the default) or buys (any buy)."
+          },
+          "dedup_secs": {
+            "description": "DedupSecs merges wallets whose trades are within this many seconds of each other into one; absent is 1, 0 turns it off.",
+            "type": "integer"
+          },
+          "max_premium_pct": {
+            "description": "MaxPremiumPct caps how far the price may sit above the counted wallets' average entry, in percent; holders and buyers only.",
+            "type": "number"
+          },
+          "metric": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ConfluenceMetric"
+              }
+            ],
+            "description": "Metric is what a wallet is counted by: holding (entered within the window), buying or selling."
+          },
+          "min_buy_sol": {
+            "description": "MinBuySol is the SOL a wallet must have bought over its position to count; absent is no floor.",
+            "type": "number"
+          },
+          "min_sell_pct": {
+            "description": "MinSellPct is the share of its position a wallet must have sold to count, required with sellers only.",
+            "type": "number"
+          },
+          "op": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ComparisonOp"
+              }
+            ],
+            "description": "Op is gte (at least) or lte (at most)."
+          },
+          "sources": {
+            "description": "Sources records the favorites groups the wallets came from; nothing evaluates it.",
+            "items": {
+              "$ref": "#/components/schemas/pulsight_internal_core_domain_strategy.ConfluenceSource"
+            },
+            "type": "array"
+          },
+          "value": {
+            "description": "Value is the threshold: 1 to the set size with gte, 0 to one less than the set size with lte.",
+            "type": "integer"
+          },
+          "wallets": {
+            "description": "Wallets is the set, 2 to 50 distinct addresses.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "window_secs": {
+            "description": "WindowSecs is the window in seconds, 10 to 604800.",
+            "type": "integer"
+          }
+        },
+        "type": "object"
       },
       "pulsight_internal_core_domain_subscription.SubscriptionTier": {
         "enum": [
@@ -11575,6 +11861,18 @@
           },
           "limits": {
             "$ref": "#/components/schemas/pulsight_internal_core_ports_input.PlanLimitsRead"
+          },
+          "pending_at": {
+            "description": "PendingAt is when the scheduled change takes effect: the end of the paid\nperiod.",
+            "type": "string"
+          },
+          "pending_tier": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_domain_subscription.SubscriptionTier"
+              }
+            ],
+            "description": "PendingTier is the plan a change scheduled for the end of the paid period\nmoves to at PendingAt: a card downgrade, or the plan a crypto subscription\nthat no longer renews is paid at when renewed. Absent when no change is\nscheduled, and while a cancellation is."
           },
           "price_usd": {
             "type": "number"
