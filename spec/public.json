@@ -12025,6 +12025,10 @@
           },
           "ts": {
             "type": "string"
+          },
+          "tx_failed": {
+            "description": "TxFailed marks an `insufficient_balance` buy sent while the run's cash\nwas at or below zero: a failed transaction that paid nothing. False on a\nbuy declined before sending because the cash left was short.",
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -12118,6 +12122,9 @@
           "latency_slots": {
             "type": "integer"
           },
+          "native_reserve_pct": {
+            "type": "number"
+          },
           "per_pool": {
             "type": "boolean"
           },
@@ -12165,6 +12172,9 @@
           "timeframe": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Timeframe"
           },
+          "unlimited_capital": {
+            "type": "boolean"
+          },
           "user_id": {
             "type": "string"
           },
@@ -12185,6 +12195,10 @@
             "description": "LatencySlots is the copy-fill landing latency in slots (blocks),\n0..MaxLatencySlots. 0 (default) keeps the zero-latency model: a copy\nfills at the target's own post-swap price with slippage charged as a\nflat haircut. 1..3 fills at the pool's EMPIRICAL resting price that many\nslots after the target's swap, and the exec's slippage_bps becomes a\nREVERT GATE instead of a charge — the fill is rejected (tip + priority\nfee still paid) when the landing price drifted past the tolerance,\nmatching how a transaction's min_out floor behaves. Only copy-style\nfills (Copy* and Target-signal-driven Emits) are affected; candle-driven\nfills already price on the bucket close.",
             "type": "integer"
           },
+          "native_reserve_pct": {
+            "description": "NativeReservePct keeps that share of the run's cash (0..50, a percentage)\nout of reach of buys, with a 0.01 SOL floor when above 0, as a live\nsession's native_reserve_pct does. 0 (default) reserves nothing, as a\npaper session does. Refused with unlimited_capital.",
+            "type": "number"
+          },
           "per_pool": {
             "description": "PerPool, when true, simulates each of a mint's significant markets as an\nINDEPENDENT instrument — its own candle stream, indicators, ledger and\n(for copy strategies) the target swaps on THAT pool — instead of a single\ndominant/pinned pool per mint. Off ⇒ the historical one-position-per-mint\nbehaviour. Mutually exclusive with a SingleMint pool pin (a pin already\nselects one market). Fans out compute by up to MaxPoolsPerMint per mint,\nreflected in the tick-budget estimate.",
             "type": "boolean"
@@ -12203,6 +12217,10 @@
           },
           "timeframe": {
             "$ref": "#/components/schemas/pulsight_internal_core_domain_aggregator.Timeframe"
+          },
+          "unlimited_capital": {
+            "description": "UnlimitedCapital lifts the run's cash gate: every buy fills whatever the\ncash, which may go negative, as runs did before the gate existed. Off\n(default), a buy the cash cannot pay is an `insufficient_balance` decline.",
+            "type": "boolean"
           },
           "venue": {
             "allOf": [
@@ -12238,12 +12256,34 @@
             "description": "AvgLandingDriftBps is the mean ADVERSE-signed drift (bps) actually\ncrossed by the run's FILLED copies — what latency cost on the fills that\nwent through (reverted ones are excluded; their cost shows as\nRevertFeesSol + missed entries). Nil when the run had no landing fills.",
             "type": "number"
           },
+          "capital_model": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/pulsight_internal_core_usecases_backtest.CapitalModel"
+              }
+            ],
+            "description": "CapitalModel is how the run's cash constrained its buys: \"portfolio\" or\n\"unlimited\". Absent on a run from before the cash gate, which never\nconstrained capital."
+          },
           "capital_required_sol": {
-            "description": "CapitalRequiredSol is the starting balance that would have kept the cash\nwalk at or above zero: max(StartingBalanceSol, StartingBalanceSol-MinCashSol).",
+            "description": "CapitalRequiredSol is the starting balance that would have kept the cash\nat or above zero along the same fills: max(StartingBalanceSol,\nStartingBalanceSol-MinCashSol).",
+            "type": "number"
+          },
+          "cash_declined_buys": {
+            "description": "CashDeclinedBuys counts the buy attempts the run declined before sending\nbecause the cash left could not pay them (`insufficient_balance`,\ntx_failed false), candle-driven Emit buys included; CashDeclinedSol is\nthe SOL they asked for.",
+            "type": "integer"
+          },
+          "cash_declined_sol": {
+            "type": "number"
+          },
+          "cash_failed_buys": {
+            "description": "CashFailedBuys counts the buy attempts sent while the cash was at or\nbelow zero, which failed and paid nothing (`insufficient_balance`,\ntx_failed true); CashFailedSol is the SOL they asked for.",
+            "type": "integer"
+          },
+          "cash_failed_sol": {
             "type": "number"
           },
           "copies_declined": {
-            "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE refused: cooldown, sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit — plus the sells this run sat\nout because the target only sold tokens it had never mirrored. Reverts\nand unpriced skips have their own counters and are not in here. Every\none is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
+            "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE refused: cooldown, sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit, cash left too short — plus\nthe sells this run sat out because the target only sold tokens it had\nnever mirrored. Reverts, buys that failed on an empty cash and unpriced\nskips have their own counters and are not in here. Every\none is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "copies_reverted": {
@@ -12259,15 +12299,23 @@
             "type": "integer"
           },
           "copies_skipped_unpriced": {
-            "description": "CopiesSkippedUnpriced counts mirror trades that passed every rule and\nwould have fired, but whose triggering swap could not be priced honestly\n— so they were NOT traded. Two causes, both data-side:\n\n  1. no post-swap price on the leg at all (every Meteora DLMM leg, and\n     every DAMM v2 / DBC leg ingested before those decoders were fixed);\n  2. a leg whose reserve is impossible for a post-swap snapshot, which\n     means it is a PRE-swap one and its price is the pre-swap price\n     (PumpSwap — see postSwapReserveConsistent).\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. Cause 1 makes a launch-sniping\nmirror over historical data skip most of its entries; cause 2 fires on\nexactly the large launch buys such a strategy targets. Surfaced so a\nmostly-skipped run reads as \"not enough data\" instead of quietly looking\nlike a thin strategy — or worse, than being filled at a fictional price\nand looking profitable. Additive JSONB field — old rows decode as 0.",
+            "description": "CopiesSkippedUnpriced counts mirror BUYS that passed every rule and\nwould have fired, but whose triggering swap could not be priced honestly\n— so they were NOT traded. A signal-driven exit on such a swap is never\nskipped: it fills at a fallback mark (ExitsAtFallbackMark). Two causes,\nboth data-side:\n\n  1. no post-swap price on the leg at all (every Meteora DLMM leg, and\n     every DAMM v2 / DBC leg ingested before those decoders were fixed);\n  2. a leg whose reserve is impossible for a post-swap snapshot, which\n     means it is a PRE-swap one and its price is the pre-swap price\n     (PumpSwap — see postSwapReserveConsistent).\n\nA non-zero value means the run under-represents the strategy: it is a\nCOVERAGE gap, not a signal quality one. Cause 1 makes a launch-sniping\nmirror over historical data skip most of its entries; cause 2 fires on\nexactly the large launch buys such a strategy targets. Surfaced so a\nmostly-skipped run reads as \"not enough data\" instead of quietly looking\nlike a thin strategy — or worse, than being filled at a fictional price\nand looking profitable. Additive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "emit_buys_declined": {
-            "description": "EmitBuysDeclined counts the candle closes on which an Emit buy whose\nrule held was refused by a rule — sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit — once per refusal: an Emit\nbuy refused on consecutive closes for the same reason counts once, until\nit fills, a close finds it not ready to fire or the reason changes. Each\none is persisted as a `backtest_declines` row with its reason, source\n`emit_buy` and no triggering swap. An Emit buy a target's swap triggered\ncounts in CopiesDeclined instead. Additive JSONB field — old rows decode\nas 0.",
+            "description": "EmitBuysDeclined counts the candle closes on which an Emit buy whose\nrule held was refused by a rule — sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit, cash left too short (a buy\nthat failed on an empty cash is not in here) — once per refusal: an Emit\nbuy refused on consecutive closes for the same reason counts once, until\nit fills, a close finds it not ready to fire or the reason changes. Each\none is persisted as a `backtest_declines` row with its reason, source\n`emit_buy` and no triggering swap. An Emit buy a target's swap triggered\ncounts in CopiesDeclined instead. Additive JSONB field — old rows decode\nas 0.",
             "type": "integer"
           },
           "ending_balance_sol": {
             "type": "number"
+          },
+          "exits_at_fallback_mark": {
+            "description": "ExitsAtFallbackMark counts signal-driven exits whose triggering swap\ncould not be priced (no SOL price on the leg, or no honest post-swap\nprice) and that filled anyway on the run's own market: at the last mark\n(the last candle close, or the latest priceable swap before the first\nclose) and its pool depth, else at the position's average cost. A copy\nsell needs only the target's fraction and the run's own market, so the\nrun sells instead of holding the bag. Additive JSONB\nfield — old rows decode as 0.",
+            "type": "integer"
+          },
+          "exits_unmarked": {
+            "description": "ExitsUnmarked is the part of ExitsAtFallbackMark that found no mark at\nall and filled at the position's average cost with no depth term, so\nit realizes no price move, only its costs. Additive JSONB field — old rows\ndecode as 0.",
+            "type": "integer"
           },
           "fees_paid_sol": {
             "type": "number"
@@ -12294,7 +12342,11 @@
             "type": "number"
           },
           "min_cash_sol": {
-            "description": "MinCashSol is the low point of the chronological cash walk: the starting\nbalance minus every buy's size and costs, plus every sell's proceeds net\nof costs, minus reverted fills' costs. Negative means the run spent SOL\nthe starting balance never had — the engine replays each token's whole\nwindow before the next one and cannot gate a buy on portfolio cash.",
+            "description": "MinCashSol is the low point of the run's cash, walked in replay order:\nthe starting balance minus every buy's size and costs, plus every sell's\nproceeds net of costs, minus reverted fills' costs. Under the portfolio\ncapital model a buy the cash cannot pay never fills, so it dips below\nzero only when a fill's fixed fees outrun the fee headroom a buy keeps;\nunder unlimited_capital, negative means the run spent SOL the starting\nbalance never had.",
+            "type": "number"
+          },
+          "native_reserve_pct": {
+            "description": "NativeReservePct echoes the run's native reserve (req.NativeReservePct).",
             "type": "number"
           },
           "our_avg_price_impact_pct": {
@@ -12454,6 +12506,17 @@
         },
         "type": "object"
       },
+      "pulsight_internal_core_usecases_backtest.CapitalModel": {
+        "enum": [
+          "portfolio",
+          "unlimited"
+        ],
+        "type": "string",
+        "x-enum-varnames": [
+          "CapitalModelPortfolio",
+          "CapitalModelUnlimited"
+        ]
+      },
       "pulsight_internal_core_usecases_backtest.DeclineReason": {
         "enum": [
           "cooldown",
@@ -12468,7 +12531,8 @@
           "rate_limited",
           "reverted",
           "unmirrored",
-          "curve_complete"
+          "curve_complete",
+          "insufficient_balance"
         ],
         "type": "string",
         "x-enum-varnames": [
@@ -12484,7 +12548,8 @@
           "DeclineRateLimited",
           "DeclineReverted",
           "DeclineUnmirrored",
-          "DeclineCurveComplete"
+          "DeclineCurveComplete",
+          "DeclineInsufficientBalance"
         ]
       },
       "pulsight_internal_core_usecases_backtest.EquityCurve": {
