@@ -12269,21 +12269,21 @@
             "type": "number"
           },
           "cash_declined_buys": {
-            "description": "CashDeclinedBuys counts the buy attempts the run declined before sending\nbecause the cash left could not pay them (`insufficient_balance`,\ntx_failed false), candle-driven Emit buys included; CashDeclinedSol is\nthe SOL they asked for.",
+            "description": "CashDeclinedBuys counts the buy attempts the run declined before sending\nbecause the cash left could not pay them (`insufficient_balance`,\ntx_failed false), candle-driven Emit buys included; CashDeclinedSol is\nthe SOL they asked for. Each one also counts in CopiesDeclined or\nEmitBuysDeclined.",
             "type": "integer"
           },
           "cash_declined_sol": {
             "type": "number"
           },
           "cash_failed_buys": {
-            "description": "CashFailedBuys counts the buy attempts sent while the cash was at or\nbelow zero, which failed and paid nothing (`insufficient_balance`,\ntx_failed true); CashFailedSol is the SOL they asked for.",
+            "description": "CashFailedBuys counts the buy attempts sent while the cash was at or\nbelow zero, which failed and paid nothing (`insufficient_balance`,\ntx_failed true), candle-driven Emit buys included; CashFailedSol is the\nSOL they asked for. Each one also counts in CopiesDeclined or\nEmitBuysDeclined.",
             "type": "integer"
           },
           "cash_failed_sol": {
             "type": "number"
           },
           "copies_declined": {
-            "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE refused: cooldown, sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit, cash left too short — plus\nthe sells this run sat out because the target only sold tokens it had\nnever mirrored. Reverts, buys that failed on an empty cash and unpriced\nskips have their own counters and are not in here. Every\none is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
+            "description": "CopiesDeclined counts target swaps a signal-driven exec wanted to act\non but that a RULE or the run's cash refused: cooldown, sizing,\nmax_buys_per_open_position, exposure cap, bracket placement, rate limit,\ncash left too short, a buy that failed on an empty cash — plus the sells\nthis run sat out because the target only sold tokens it had never\nmirrored. Reverts and unpriced skips have their own counters and are not\nin here. Every one is persisted as a `backtest_declines` row with its reason, so the\ntrade history reads as a complete account of the target's swaps.\nAdditive JSONB field — old rows decode as 0.",
             "type": "integer"
           },
           "copies_reverted": {
@@ -12303,7 +12303,7 @@
             "type": "integer"
           },
           "emit_buys_declined": {
-            "description": "EmitBuysDeclined counts the candle closes on which an Emit buy whose\nrule held was refused by a rule — sizing, max_buys_per_open_position,\nexposure cap, bracket placement, rate limit, cash left too short (a buy\nthat failed on an empty cash is not in here) — once per refusal: an Emit\nbuy refused on consecutive closes for the same reason counts once, until\nit fills, a close finds it not ready to fire or the reason changes. Each\none is persisted as a `backtest_declines` row with its reason, source\n`emit_buy` and no triggering swap. An Emit buy a target's swap triggered\ncounts in CopiesDeclined instead. Additive JSONB field — old rows decode\nas 0.",
+            "description": "EmitBuysDeclined counts the candle closes on which an Emit buy whose\nrule held was refused by a rule or the run's cash — sizing,\nmax_buys_per_open_position, exposure cap, bracket placement, rate limit,\ncash left too short, a buy that failed on an empty cash — once per\nrefusal: an Emit buy refused on consecutive closes for the same reason\ncounts once, until it fills, a close finds it not ready to fire or the\nreason (or, for insufficient_balance, tx_failed) changes. Each\none is persisted as a `backtest_declines` row with its reason, source\n`emit_buy` and no triggering swap. An Emit buy a target's swap triggered\ncounts in CopiesDeclined instead. Additive JSONB field — old rows decode\nas 0.",
             "type": "integer"
           },
           "ending_balance_sol": {
